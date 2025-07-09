@@ -1,0 +1,7 @@
+__pycache__/
+.history/
+.claude/
+node_modules
+package-lock.json
+*.png
+PLANNING.md

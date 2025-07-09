@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-text-primary;
+    font-family: 'JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Custom select styling to match terminal theme */
+  select::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  select::-webkit-scrollbar-track {
+    background: #141414;
+  }
+  
+  select::-webkit-scrollbar-thumb {
+    background: #262626;
+    border-radius: 4px;
+  }
+  
+  select::-webkit-scrollbar-thumb:hover {
+    background: #1a1a1a;
+  }
+}
