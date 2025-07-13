@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
-import { useInvestmentStore } from './store/investmentStore'
-import { useInitializeData } from './hooks/useInitializeData'
+import { useEffect, useState } from 'react'
+import { useAppData } from './context/AppProvider'
+import { loadCSVFromFile } from './utils/csv'
 import Container from './components/layout/Container'
 import Navigation from './components/layout/Navigation'
 import Overview from './components/views/Overview'
@@ -9,32 +9,80 @@ import TimeSeries from './components/views/TimeSeries'
 import AddEntry from './components/views/AddEntry'
 
 function App() {
-  const { viewMode, setViewMode } = useInvestmentStore()
-  const { isInitialized, isLoading, error } = useInitializeData()
+  const { data, updateUI, updateData } = useAppData()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const isInitialized = data.entries.length > 0
+  const { viewMode } = data.ui
 
   useEffect(() => {
+    const initializeData = async () => {
+      if (data.entries.length > 0) return
+      
+      setIsLoading(true)
+      setError(null)
+      
+      try {
+        const result = await loadCSVFromFile('/investments.csv')
+        
+        if (result.errors.length > 0) {
+          console.warn('CSV parsing warnings:', result.errors)
+          setError(`Data loaded with warnings: ${result.errors.slice(0, 3).join(', ')}${result.errors.length > 3 ? '...' : ''}`)
+        }
+        
+        if (result.data.length > 0) {
+          updateData({ entries: result.data })
+          console.log(`Loaded ${result.data.length} investment entries from CSV`)
+        } else {
+          setError('No data found in CSV file')
+        }
+      } catch (error) {
+        console.error('Failed to load investment data:', error)
+        setError('Failed to load investment data. Please check the CSV file.')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    initializeData()
+  }, [data.entries.length, updateData])
+  
+  useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
+      // Ignore shortcuts when modifier keys are pressed
       if (event.ctrlKey || event.metaKey) return
+      
+      // Ignore shortcuts when user is typing in input fields
+      const target = event.target as HTMLElement
+      const isInputFocused = target && (
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.tagName === 'SELECT' ||
+        target.contentEditable === 'true' ||
+        target.closest('input, textarea, select, [contenteditable]')
+      )
+      
+      if (isInputFocused) return
       
       switch (event.key) {
         case '1':
-          setViewMode('overview')
+          updateUI({ viewMode: 'overview' })
           break
         case '2':
-          setViewMode('snapshot')
+          updateUI({ viewMode: 'snapshot' })
           break
         case '3':
-          setViewMode('timeseries')
+          updateUI({ viewMode: 'timeseries' })
           break
         case '4':
-          setViewMode('add')
+          updateUI({ viewMode: 'add' })
           break
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [setViewMode])
+  }, [updateUI])
 
   const renderView = () => {
     switch (viewMode) {
@@ -96,7 +144,7 @@ function App() {
         )}
         <Navigation 
           activeView={viewMode} 
-          onViewChange={setViewMode}
+          onViewChange={(mode) => updateUI({ viewMode: mode })}
         />
         <main className="transition-all duration-300 ease-in-out">
           {renderView()}

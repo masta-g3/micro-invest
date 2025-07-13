@@ -261,4 +261,61 @@ export const getDiversificationScore = (allocation: Record<string, number>): num
   const normalizedScore = ((maxHhi - hhi) / (maxHhi - (10000 / n))) * 100
   
   return Math.max(0, Math.min(100, normalizedScore))
+}
+
+export const calculateSnapshot = (entries: InvestmentEntry[], date: string): PortfolioSnapshot => {
+  const dateEntries = entries.filter(entry => entry.date === date)
+  
+  const totalValue = dateEntries
+    .filter(entry => entry.amount > 0)
+    .reduce((sum, entry) => sum + entry.amount, 0)
+  
+  const totalDebt = Math.abs(dateEntries
+    .filter(entry => entry.amount < 0)
+    .reduce((sum, entry) => sum + entry.amount, 0))
+  
+  const netWorth = totalValue - totalDebt
+  
+  return {
+    date,
+    entries: dateEntries,
+    totalValue,
+    totalDebt,
+    netWorth
+  }
+}
+
+export const calculateInsight = (snapshot: PortfolioSnapshot, previousSnapshot?: PortfolioSnapshot) => {
+  const positiveEntries = snapshot.entries.filter(entry => entry.amount > 0)
+  
+  // Find top and underperformer by rate
+  let topPerformer = { name: '', growth: -Infinity }
+  let underperformer = { name: '', growth: Infinity }
+  
+  positiveEntries.forEach(entry => {
+    if (entry.rate > topPerformer.growth) {
+      topPerformer = { name: entry.investment, growth: entry.rate }
+    }
+    if (entry.rate < underperformer.growth) {
+      underperformer = { name: entry.investment, growth: entry.rate }
+    }
+  })
+  
+  // Calculate monthly change
+  const monthlyChange = previousSnapshot 
+    ? ((snapshot.netWorth - previousSnapshot.netWorth) / previousSnapshot.netWorth) * 100
+    : 0
+  
+  // Calculate allocation
+  const allocation: Record<string, number> = {}
+  positiveEntries.forEach(entry => {
+    allocation[entry.investment] = (entry.amount / snapshot.totalValue) * 100
+  })
+  
+  return {
+    topPerformer,
+    underperformer,
+    monthlyChange,
+    allocation
+  }
 } 

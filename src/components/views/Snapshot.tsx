@@ -1,23 +1,27 @@
+import { useState } from 'react'
 import Card from '../layout/Card'
-import { ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react'
-import { useInvestmentStore } from '../../store/investmentStore'
-import { formatCurrency, formatPercentage } from '../../utils/calculations'
+import { ChevronLeft, ChevronRight, Lightbulb, Edit3, Check, X } from 'lucide-react'
+import { useAppData } from '../../context/AppProvider'
+import { formatCurrency, formatPercentage, calculateInsight } from '../../utils/calculations'
 import { format } from 'date-fns'
+import { InvestmentEntry } from '../../types'
 
 export default function Snapshot() {
-  const { 
-    selectedDate,
-    setSelectedDate,
-    getSnapshotForDate,
-    getInsightForDate,
-    getAvailableDates,
-    snapshots
-  } = useInvestmentStore()
+  const { data, updateUI, snapshots, getAvailableDates, updateEntry } = useAppData()
+  const selectedDate = data.ui.selectedDate
+  const [editingEntry, setEditingEntry] = useState<InvestmentEntry | null>(null)
+  const [editValues, setEditValues] = useState({ amount: '', rate: '' })
 
   const availableDates = getAvailableDates()
   const currentDate = selectedDate || (availableDates.length > 0 ? availableDates[0] : null)
-  const snapshot = currentDate ? getSnapshotForDate(currentDate) : null
-  const insight = currentDate ? getInsightForDate(currentDate) : null
+  const snapshot = currentDate ? snapshots.find(s => s.date === currentDate) : null
+  
+  // Calculate insight for current snapshot
+  const insight = snapshot ? (() => {
+    const currentIndex = snapshots.findIndex(s => s.date === snapshot.date)
+    const previousSnapshot = currentIndex > 0 ? snapshots[currentIndex - 1] : undefined
+    return calculateInsight(snapshot, previousSnapshot)
+  })() : null
 
   // Find previous and next dates
   const currentIndex = availableDates.indexOf(currentDate || '')
@@ -25,12 +29,44 @@ export default function Snapshot() {
   const nextDate = currentIndex > 0 ? availableDates[currentIndex - 1] : null
 
   // Calculate changes from previous month
-  const previousSnapshot = previousDate ? getSnapshotForDate(previousDate) : null
+  const previousSnapshot = previousDate ? snapshots.find(s => s.date === previousDate) : null
   const entriesWithChanges = snapshot?.entries.map(entry => {
     const previousEntry = previousSnapshot?.entries.find(e => e.investment === entry.investment)
     const change = previousEntry ? entry.amount - previousEntry.amount : 0
     return { ...entry, change }
   }) || []
+
+  const startEdit = (entry: InvestmentEntry) => {
+    setEditingEntry(entry)
+    setEditValues({ 
+      amount: Math.abs(entry.amount).toString(), 
+      rate: entry.rate.toString() 
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingEntry(null)
+    setEditValues({ amount: '', rate: '' })
+  }
+
+  const saveEdit = () => {
+    if (!editingEntry) return
+    
+    const newAmount = parseFloat(editValues.amount) * (editingEntry.amount < 0 ? -1 : 1)
+    const newRate = parseFloat(editValues.rate)
+    
+    if (isNaN(newAmount) || isNaN(newRate)) return
+    
+    const newEntry: InvestmentEntry = {
+      ...editingEntry,
+      amount: newAmount,
+      rate: newRate
+    }
+    
+    updateEntry(editingEntry, newEntry)
+    setEditingEntry(null)
+    setEditValues({ amount: '', rate: '' })
+  }
 
   if (!snapshot) {
     return (
@@ -60,7 +96,7 @@ export default function Snapshot() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <button 
-          onClick={() => previousDate && setSelectedDate(previousDate)}
+          onClick={() => previousDate && updateUI({ selectedDate: previousDate })}
           disabled={!previousDate}
           className={`flex items-center space-x-2 transition-colors ${
             previousDate 
@@ -75,7 +111,7 @@ export default function Snapshot() {
           {formatDate(currentDate || '')}
         </h2>
         <button 
-          onClick={() => nextDate && setSelectedDate(nextDate)}
+          onClick={() => nextDate && updateUI({ selectedDate: nextDate })}
           disabled={!nextDate}
           className={`flex items-center space-x-2 transition-colors ${
             nextDate 
@@ -97,27 +133,90 @@ export default function Snapshot() {
                 <th className="text-right py-3 text-text-secondary font-medium">Amount</th>
                 <th className="text-right py-3 text-text-secondary font-medium hidden sm:table-cell">Rate</th>
                 <th className="text-right py-3 text-text-secondary font-medium">Change</th>
+                <th className="text-center py-3 text-text-secondary font-medium w-20">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {entriesWithChanges.map((entry, index) => (
-                <tr key={index} className="border-b border-border last:border-b-0">
-                  <td className="py-3 text-text-primary font-medium">{entry.investment}</td>
-                  <td className={`py-3 text-right font-medium ${
-                    entry.amount < 0 ? 'text-danger' : 'text-text-primary'
+              {entriesWithChanges.map((entry, index) => {
+                const isEditing = editingEntry?.date === entry.date && editingEntry?.investment === entry.investment
+                
+                return (
+                  <tr key={index} className={`border-b border-border last:border-b-0 ${
+                    isEditing ? 'bg-surface-hover/50' : 'hover:bg-surface-hover/30'
                   }`}>
-                    {formatCurrency(Math.abs(entry.amount))}
-                  </td>
-                  <td className="py-3 text-right text-text-secondary hidden sm:table-cell">
-                    {formatPercentage(entry.rate, 1).replace('+', '')}
-                  </td>
-                  <td className={`py-3 text-right font-medium ${
-                    entry.change > 0 ? 'text-accent' : entry.change < 0 ? 'text-danger' : 'text-text-secondary'
-                  }`}>
-                    {entry.change !== 0 ? formatCurrency(entry.change) : '—'}
-                  </td>
-                </tr>
-              ))}
+                    <td className="py-3 text-text-primary font-medium">{entry.investment}</td>
+                    
+                    {/* Amount Column */}
+                    <td className={`py-3 text-right font-medium ${
+                      entry.amount < 0 ? 'text-danger' : 'text-text-primary'
+                    }`}>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editValues.amount}
+                          onChange={(e) => setEditValues({ ...editValues, amount: e.target.value })}
+                          className="w-24 px-2 py-1 text-right bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                          placeholder="Amount"
+                        />
+                      ) : (
+                        formatCurrency(Math.abs(entry.amount))
+                      )}
+                    </td>
+                    
+                    {/* Rate Column */}
+                    <td className="py-3 text-right text-text-secondary hidden sm:table-cell">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editValues.rate}
+                          onChange={(e) => setEditValues({ ...editValues, rate: e.target.value })}
+                          className="w-16 px-2 py-1 text-right bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                          placeholder="Rate"
+                        />
+                      ) : (
+                        formatPercentage(entry.rate, 1).replace('+', '')
+                      )}
+                    </td>
+                    
+                    {/* Change Column */}
+                    <td className={`py-3 text-right font-medium ${
+                      entry.change > 0 ? 'text-accent' : entry.change < 0 ? 'text-danger' : 'text-text-secondary'
+                    }`}>
+                      {entry.change !== 0 ? formatCurrency(entry.change) : '—'}
+                    </td>
+                    
+                    {/* Actions Column */}
+                    <td className="py-3 text-center">
+                      {isEditing ? (
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={saveEdit}
+                            className="p-1 text-accent hover:bg-accent/10 rounded transition-colors"
+                            title="Save changes"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="p-1 text-text-secondary hover:bg-surface-hover rounded transition-colors"
+                            title="Cancel editing"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => startEdit(entry)}
+                          className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors"
+                          title="Edit entry"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

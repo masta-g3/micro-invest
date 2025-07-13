@@ -1,44 +1,48 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import Card from '../layout/Card'
 import ViewToggle from '../ui/ViewToggle'
-import { useInvestmentStore } from '../../store/investmentStore'
+import { useAppData } from '../../context/AppProvider'
 import { 
   transformSnapshots, 
   DataType, 
-  TimeView, 
-  AssetView,
   getDataTypeLabel,
   formatChartValue 
 } from '../../utils/chartData'
 import { getAssetColorMap } from '../../utils/colors'
 
 export default function TimeSeries() {
-  const [dataType, setDataType] = useState<DataType>('returns')
-  const [viewType, setViewType] = useState<TimeView>('cumulative')
-  const [assetView, setAssetView] = useState<AssetView>('individual')
+  const { data, updateUI, snapshots } = useAppData()
+  const { mainView, performanceView, ownershipView, showByAsset, visibleAssets } = data.ui.chartSettings
   
-  const { snapshots, getAssetTypes } = useInvestmentStore()
+  // Map new settings to existing logic
+  const dataType = mainView === 'performance' ? 'returns' : ownershipView === 'allocation' ? 'allocation' : 'portfolio'
+  const viewType = mainView === 'performance' ? performanceView : 'cumulative'
   
   // Get available assets (excluding debt)
   const availableAssets = useMemo(() => {
-    return getAssetTypes().filter(asset => asset !== 'Debt')
-  }, [getAssetTypes])
+    const assets = [...new Set(data.entries.map(e => e.investment))].filter(asset => asset !== 'Debt')
+    return assets.sort()
+  }, [data.entries])
   
-  const [visibleAssets, setVisibleAssets] = useState<Set<string>>(
-    new Set(availableAssets.slice(0, 4)) // Show first 4 assets by default
-  )
+  const visibleAssetsSet = useMemo(() => {
+    if (visibleAssets.length === 0 && availableAssets.length > 0) {
+      const initialAssets = availableAssets.slice(0, 4)
+      updateUI({
+        chartSettings: {
+          ...data.ui.chartSettings,
+          visibleAssets: initialAssets
+        }
+      })
+      return new Set(initialAssets)
+    }
+    return new Set(visibleAssets)
+  }, [visibleAssets, availableAssets, data.ui.chartSettings, updateUI])
 
   // Transform real data instead of using mock data
   const chartData = useMemo(() => {
     return transformSnapshots(snapshots, dataType, viewType)
   }, [snapshots, dataType, viewType])
 
-  // Update available assets when data changes
-  useMemo(() => {
-    if (availableAssets.length > 0) {
-      setVisibleAssets(new Set(availableAssets.slice(0, 4)))
-    }
-  }, [availableAssets])
 
   const toggleAssetVisibility = (asset: string) => {
     const newVisible = new Set(visibleAssets)
@@ -47,8 +51,107 @@ export default function TimeSeries() {
     } else {
       newVisible.add(asset)
     }
-    setVisibleAssets(newVisible)
+    updateUI({
+      chartSettings: {
+        ...data.ui.chartSettings,
+        visibleAssets: Array.from(newVisible)
+      }
+    })
   }
+
+  // Add keyboard shortcuts for chart controls
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Only work if we're in the TimeSeries tab
+      if (data.ui.viewMode !== 'timeseries') return
+      
+      // Ignore shortcuts when modifier keys are pressed
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      
+      // Ignore shortcuts when user is typing in input fields
+      const target = event.target as HTMLElement
+      const isInputFocused = target && (
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.tagName === 'SELECT' ||
+        target.contentEditable === 'true' ||
+        target.closest('input, textarea, select, [contenteditable]')
+      )
+      
+      if (isInputFocused) return
+      
+      switch (event.key.toLowerCase()) {
+        case 'p':
+          // Switch to Performance view
+          updateUI({
+            chartSettings: {
+              ...data.ui.chartSettings,
+              mainView: 'performance'
+            }
+          })
+          break
+        case 'o':
+          // Switch to Ownership view
+          updateUI({
+            chartSettings: {
+              ...data.ui.chartSettings,
+              mainView: 'ownership'
+            }
+          })
+          break
+        case 'k':
+          // Toggle bottom level options (left option)
+          if (mainView === 'performance') {
+            updateUI({
+              chartSettings: {
+                ...data.ui.chartSettings,
+                performanceView: 'cumulative'
+              }
+            })
+          } else {
+            updateUI({
+              chartSettings: {
+                ...data.ui.chartSettings,
+                ownershipView: 'allocation'
+              }
+            })
+          }
+          break
+        case 'l':
+          // Toggle bottom level options (right option)
+          if (mainView === 'performance') {
+            updateUI({
+              chartSettings: {
+                ...data.ui.chartSettings,
+                performanceView: 'period'
+              }
+            })
+          } else {
+            updateUI({
+              chartSettings: {
+                ...data.ui.chartSettings,
+                ownershipView: 'value'
+              }
+            })
+          }
+          break
+        case 'a':
+          // Toggle "Show by asset" (only available in Performance view)
+          if (mainView === 'performance') {
+            updateUI({
+              chartSettings: {
+                ...data.ui.chartSettings,
+                showByAsset: !showByAsset
+              }
+            })
+          }
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [data.ui.viewMode, data.ui.chartSettings, mainView, showByAsset, updateUI])
 
 
   const ToggleButton = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
@@ -76,7 +179,7 @@ export default function TimeSeries() {
   // Line chart component for cumulative performance
   const LineChart = ({ data, assets }: { data: any[], assets: string[] }) => {
     const filteredAssets = assets.filter(asset => 
-      asset === 'Total Portfolio' || visibleAssets.has(asset)
+      asset === 'Total Portfolio' || visibleAssetsSet.has(asset)
     )
     // Generate dynamic color mapping for all available assets
     const colors = getAssetColorMap([...availableAssets, 'Total Portfolio'])
@@ -189,7 +292,7 @@ export default function TimeSeries() {
               className={`flex items-center space-x-2 transition-opacity ${
                 asset === 'Total Portfolio' ? 'cursor-default' : 'cursor-pointer hover:opacity-80'
               } ${
-                asset === 'Total Portfolio' || visibleAssets.has(asset) ? 'opacity-100' : 'opacity-40'
+                asset === 'Total Portfolio' || visibleAssetsSet.has(asset) ? 'opacity-100' : 'opacity-40'
               }`}
             >
               <div 
@@ -204,10 +307,102 @@ export default function TimeSeries() {
     )
   }
 
+  // Stacked area chart for ownership values
+  const StackedAreaChart = ({ data, assets }: { data: any[], assets: string[] }) => {
+    const filteredAssets = assets.filter(asset => 
+      asset !== 'Total Portfolio' && (asset === 'Total Portfolio' || visibleAssetsSet.has(asset))
+    )
+    const colors = getAssetColorMap([...availableAssets, 'Total Portfolio'])
+
+    // Calculate cumulative stacking for each time point
+    const stackedData = data.map(month => {
+      const stacked: any = { date: month.date }
+      let cumulativeSum = 0
+      
+      filteredAssets.forEach(asset => {
+        const value = month.assets[asset] || 0
+        stacked[asset] = cumulativeSum + value
+        cumulativeSum += value
+      })
+      
+      return stacked
+    })
+
+    const maxValue = Math.max(...stackedData.map(d => 
+      Math.max(...filteredAssets.map(asset => d[asset]))
+    ))
+
+    return (
+      <div className="bg-surface-hover/30 rounded-lg p-4 relative">
+        {/* Y-axis labels */}
+        <div className="absolute left-0 top-0 h-52 flex flex-col justify-between text-xs text-text-muted py-4">
+          <span>${(maxValue / 1000).toFixed(0)}k</span>
+          <span>${(maxValue / 2 / 1000).toFixed(0)}k</span>
+          <span>$0</span>
+        </div>
+
+        {/* Chart area */}
+        <div className="ml-12 h-52 relative">
+          <svg className="w-full h-full" viewBox="0 0 600 200" preserveAspectRatio="none">
+            {filteredAssets.map((asset) => {
+              const areaPoints = stackedData.map((d, index) => {
+                const x = (index / (stackedData.length - 1)) * 600
+                const y = 200 - (d[asset] / maxValue * 200)
+                return `${x},${y}`
+              })
+              
+              // Create bottom line (previous asset's top line)
+              const bottomPoints = stackedData.map((d, index) => {
+                const x = (index / (stackedData.length - 1)) * 600
+                const prevAssetIndex = filteredAssets.indexOf(asset) - 1
+                const prevValue = prevAssetIndex >= 0 ? 
+                  stackedData[index][filteredAssets[prevAssetIndex]] : 0
+                const y = 200 - (prevValue / maxValue * 200)
+                return `${x},${y}`
+              })
+
+              const pathData = `M ${areaPoints.join(' L ')} L ${bottomPoints.reverse().join(' L ')} Z`
+
+              return (
+                <path
+                  key={asset}
+                  d={pathData}
+                  fill={colors[asset] || '#10b981'}
+                  fillOpacity="0.7"
+                  stroke={colors[asset] || '#10b981'}
+                  strokeWidth="1"
+                />
+              )
+            })}
+          </svg>
+        </div>
+
+        <ChartDateLabels data={stackedData} />
+
+        {/* Legend */}
+        <div className="mt-4 flex flex-wrap gap-3 text-xs">
+          {filteredAssets.map((asset) => (
+            <button
+              key={asset}
+              onClick={() => toggleAssetVisibility(asset)}
+              className="flex items-center space-x-1.5 transition-opacity cursor-pointer hover:opacity-80"
+            >
+              <div 
+                className="w-2.5 h-2.5 rounded"
+                style={{ backgroundColor: colors[asset] || '#10b981' }}
+              />
+              <span className="text-text-secondary text-xs">{asset}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   // Vertical bar chart for monthly performance
   const MonthlyBars = ({ data, assets }: { data: any[], assets: string[] }) => {
     const filteredAssets = assets.filter(asset => 
-      asset === 'Total Portfolio' || visibleAssets.has(asset)
+      asset === 'Total Portfolio' || visibleAssetsSet.has(asset)
     )
     // Generate dynamic color mapping for all available assets
     const colors = getAssetColorMap([...availableAssets, 'Total Portfolio'])
@@ -234,7 +429,6 @@ export default function TimeSeries() {
     const chartWidth = 600
     const chartHeight = 200
     const barGroupWidth = chartWidth / data.length
-    const barWidth = filteredAssets.length > 1 ? (barGroupWidth * 0.8) / filteredAssets.length : barGroupWidth * 0.6
     
     // Calculate zero line position based on actual data range
     const zeroLine = minVal < 0 ? chartHeight * (maxVal / actualRange) : chartHeight
@@ -364,7 +558,7 @@ export default function TimeSeries() {
                 className={`flex items-center space-x-1.5 transition-opacity ${
                   asset === 'Total Portfolio' ? 'cursor-default' : 'cursor-pointer hover:opacity-80'
                 } ${
-                  asset === 'Total Portfolio' || visibleAssets.has(asset) ? 'opacity-100' : 'opacity-40'
+                  asset === 'Total Portfolio' || visibleAssetsSet.has(asset) ? 'opacity-100' : 'opacity-40'
                 }`}
               >
                 <div 
@@ -438,75 +632,135 @@ export default function TimeSeries() {
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-lg font-semibold text-text-primary">{getDataTypeLabel(dataType)}</h3>
           
-          {/* Primary Data Type Toggle */}
-          <ViewToggle
-            options={[
-              { value: 'returns', label: 'Returns' },
-              { value: 'portfolio', label: 'Portfolio' },
-              { value: 'allocation', label: 'Allocation' }
-            ]}
-            value={dataType}
-            onChange={(value) => setDataType(value as DataType)}
-          />
+                  {/* Level 1: Main View Toggle */}
+        <ViewToggle
+          options={[
+            { value: 'ownership', label: 'Ownership', shortcut: 'o' },
+            { value: 'performance', label: 'Performance', shortcut: 'p' }
+          ]}
+          value={mainView}
+          onChange={(value) => updateUI({
+            chartSettings: {
+              ...data.ui.chartSettings,
+              mainView: value as 'performance' | 'ownership'
+            }
+          })}
+        />
         </div>
 
-        {/* Secondary Controls */}
-        <div className="flex justify-end space-x-4 mb-6">
-          {/* Time View Toggle */}
-          <div className="flex space-x-1 bg-surface-hover rounded-lg p-1">
-            <ToggleButton 
-              active={viewType === 'cumulative'} 
-              onClick={() => setViewType('cumulative')}
-            >
-              Cumulative
-            </ToggleButton>
-            <ToggleButton 
-              active={viewType === 'period'} 
-              onClick={() => setViewType('period')}
-            >
-              Period
-            </ToggleButton>
-          </div>
-          
-          {/* Asset View Toggle */}
-          <div className="flex space-x-1 bg-surface-hover rounded-lg p-1">
-            <ToggleButton 
-              active={assetView === 'individual'} 
-              onClick={() => setAssetView('individual')}
-            >
-              By Asset
-            </ToggleButton>
-            <ToggleButton 
-              active={assetView === 'total'} 
-              onClick={() => setAssetView('total')}
-            >
-              Total
-            </ToggleButton>
-          </div>
+        {/* Level 2: Sub-view Toggle */}
+        <div className="flex justify-end mb-6">
+          {mainView === 'performance' ? (
+            <ViewToggle
+              options={[
+                { value: 'cumulative', label: 'Cumulative Returns', shortcut: 'k' },
+                { value: 'period', label: 'Period Returns', shortcut: 'l' }
+              ]}
+              value={performanceView}
+              onChange={(value) => updateUI({
+                chartSettings: {
+                  ...data.ui.chartSettings,
+                  performanceView: value as 'cumulative' | 'period'
+                }
+              })}
+            />
+          ) : (
+            <ViewToggle
+              options={[
+                { value: 'allocation', label: 'Allocation %', shortcut: 'k' },
+                { value: 'value', label: 'Value $', shortcut: 'l' }
+              ]}
+              value={ownershipView}
+              onChange={(value) => updateUI({
+                chartSettings: {
+                  ...data.ui.chartSettings,
+                  ownershipView: value as 'allocation' | 'value'
+                }
+              })}
+            />
+          )}
         </div>
         
-        {viewType === 'cumulative' ? (
-          // Line Chart for Cumulative View
-          <>
-            <LineChart 
-              data={chartData} 
-              assets={assetView === 'total' ? ['Total Portfolio'] : availableAssets}
-            />
-            <div className="mt-8 pt-4 border-t border-border text-xs text-text-muted">
-              Showing {dataType === 'returns' ? 'cumulative returns' : dataType === 'portfolio' ? 'portfolio values' : 'asset allocation percentages'} since {chartData[0]?.date || 'start'}
-            </div>
-          </>
+        {mainView === 'performance' ? (
+          // Performance charts
+          viewType === 'cumulative' ? (
+            <>
+              <LineChart 
+                data={chartData} 
+                assets={showByAsset ? availableAssets : ['Total Portfolio']}
+              />
+              <div className="mt-8 pt-4 border-t border-border flex justify-between items-center">
+                <div className="text-xs text-text-muted">
+                  Showing cumulative returns since {chartData[0]?.date || 'start'}
+                </div>
+                <label className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    checked={showByAsset}
+                    onChange={(e) => updateUI({
+                      chartSettings: {
+                        ...data.ui.chartSettings,
+                        showByAsset: e.target.checked
+                      }
+                    })}
+                    className="rounded border-border text-accent focus:ring-accent"
+                  />
+                  <span className="text-xs text-text-secondary">Show by asset</span>
+                  <span className="text-xs text-text-muted">a</span>
+                </label>
+              </div>
+            </>
+          ) : (
+            <>
+              <MonthlyBars 
+                data={chartData} 
+                assets={showByAsset ? availableAssets : ['Total Portfolio']}
+              />
+              <div className="mt-8 pt-4 border-t border-border flex justify-between items-center">
+                <div className="text-xs text-text-muted">
+                  Showing period returns from {chartData[0]?.date} to {chartData[chartData.length - 1]?.date}
+                </div>
+                <label className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    checked={showByAsset}
+                    onChange={(e) => updateUI({
+                      chartSettings: {
+                        ...data.ui.chartSettings,
+                        showByAsset: e.target.checked
+                      }
+                    })}
+                    className="rounded border-border text-accent focus:ring-accent"
+                  />
+                  <span className="text-xs text-text-secondary">Show by asset</span>
+                  <span className="text-xs text-text-muted">a</span>
+                </label>
+              </div>
+            </>
+          )
         ) : (
-          // Bar Chart for Period View
-          <>
-            <MonthlyBars 
-              data={chartData} 
-              assets={assetView === 'total' ? ['Total Portfolio'] : availableAssets}
-            />
-            <div className="mt-8 pt-4 border-t border-border text-xs text-text-muted">
-              Showing {dataType === 'returns' ? 'period returns' : dataType === 'portfolio' ? 'period value changes' : 'asset allocation percentages'} from {chartData[0]?.date} to {chartData[chartData.length - 1]?.date}
-            </div>
-          </>
+          // Ownership charts - always show by asset
+          ownershipView === 'allocation' ? (
+            <>
+              <MonthlyBars 
+                data={chartData} 
+                assets={availableAssets}
+              />
+              <div className="mt-8 pt-4 border-t border-border text-xs text-text-muted">
+                Showing asset allocation percentages from {chartData[0]?.date} to {chartData[chartData.length - 1]?.date}
+              </div>
+            </>
+          ) : (
+            <>
+              <StackedAreaChart 
+                data={chartData} 
+                assets={availableAssets}
+              />
+              <div className="mt-8 pt-4 border-t border-border text-xs text-text-muted">
+                Showing portfolio value evolution from {chartData[0]?.date} to {chartData[chartData.length - 1]?.date}
+              </div>
+            </>
+          )
         )}
       </Card>
     </div>

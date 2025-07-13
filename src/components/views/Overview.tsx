@@ -1,22 +1,21 @@
 import Card from '../layout/Card'
 import { TrendingUp, TrendingDown } from 'lucide-react'
-import { useInvestmentStore } from '../../store/investmentStore'
-import { formatCurrency, formatPercentage } from '../../utils/calculations'
+import { useAppData } from '../../context/AppProvider'
+import { formatCurrency, formatPercentage, calculateInsight } from '../../utils/calculations'
 import { format } from 'date-fns'
 
 export default function Overview() {
-  const { 
-    getLatestSnapshot, 
-    getInsightForDate, 
-    getAvailableDates,
-    entries,
-    snapshots
-  } = useInvestmentStore()
+  const { snapshots, getLatestSnapshot, getAvailableDates } = useAppData()
 
   const latestSnapshot = getLatestSnapshot()
-  const latestDate = latestSnapshot?.date
-  const insight = latestDate ? getInsightForDate(latestDate) : null
   const availableDates = getAvailableDates().slice(0, 5) // Get 5 most recent dates
+  
+  // Calculate insight for the latest snapshot
+  const insight = latestSnapshot ? (() => {
+    const currentIndex = snapshots.findIndex(s => s.date === latestSnapshot.date)
+    const previousSnapshot = currentIndex > 0 ? snapshots[currentIndex - 1] : undefined
+    return calculateInsight(latestSnapshot, previousSnapshot)
+  })() : null
 
   // Fallback to default values if no data
   if (!latestSnapshot) {
@@ -31,7 +30,7 @@ export default function Overview() {
   const allocationData = Object.entries(insight?.allocation || {})
     .sort(([,a], [,b]) => b - a)
     .map(([name, percentage]) => {
-      const entry = latestSnapshot.entries.find(e => e.investment === name)
+      const entry = latestSnapshot.entries.find((e: any) => e.investment === name)
       return {
         name,
         value: entry?.amount || 0,
@@ -41,10 +40,10 @@ export default function Overview() {
 
   // Get top performers (positive rates only)
   const topPerformers = latestSnapshot.entries
-    .filter(entry => entry.amount > 0 && entry.rate > 0)
-    .sort((a, b) => b.rate - a.rate)
+    .filter((entry: any) => entry.amount > 0 && entry.rate > 0)
+    .sort((a: any, b: any) => b.rate - a.rate)
     .slice(0, 3)
-    .map(entry => ({
+    .map((entry: any) => ({
       name: entry.investment,
       growth: entry.rate
     }))
@@ -89,7 +88,7 @@ export default function Overview() {
         <Card>
           <h3 className="text-lg font-semibold text-text-primary mb-4">Top Performers</h3>
           <div className="space-y-3">
-            {topPerformers.length > 0 ? topPerformers.map((performer, index) => (
+            {topPerformers.length > 0 ? topPerformers.map((performer: any, index: number) => (
               <div key={index} className="flex justify-between items-center">
                 <span className="text-text-secondary">{performer.name}</span>
                 <span className="text-accent font-semibold">{formatPercentage(performer.growth)}</span>
