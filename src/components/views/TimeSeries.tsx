@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useState, useRef } from 'react'
 import Card from '../layout/Card'
 import ViewToggle from '../ui/ViewToggle'
 import { useAppData } from '../../context/AppProvider'
@@ -287,7 +287,7 @@ export default function TimeSeries() {
 
         {/* Legend */}
         <div className="mt-4 flex flex-wrap gap-4 text-xs">
-          {assets.map((asset) => (
+          {assets.map((asset: string) => (
             <button
               key={asset}
               onClick={() => asset !== 'Total Portfolio' && toggleAssetVisibility(asset)}
@@ -403,6 +403,10 @@ export default function TimeSeries() {
 
   // Vertical bar chart for monthly performance
   const MonthlyBars = ({ data, assets }: { data: any[], assets: string[] }) => {
+    // Tooltip state
+    const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; visible: boolean }>({ x: 0, y: 0, text: '', visible: false })
+    const containerRef = useRef<HTMLDivElement>(null)
+
     const filteredAssets = assets.filter(asset => 
       asset === 'Total Portfolio' || visibleAssetsSet.has(asset)
     )
@@ -410,8 +414,8 @@ export default function TimeSeries() {
     const colors = getAssetColorMap([...availableAssets, 'Total Portfolio'])
 
     // Get all values to determine scale
-    const allValues = data.flatMap(month => 
-      filteredAssets.map(asset => 
+    const allValues = data.flatMap(month =>
+      filteredAssets.map((asset: string) => 
         asset === 'Total Portfolio' ? month.total : (month.assets[asset] || 0)
       )
     )
@@ -436,7 +440,7 @@ export default function TimeSeries() {
     const zeroLine = minVal < 0 ? chartHeight * (maxVal / actualRange) : chartHeight
 
     return (
-      <div className="bg-surface-hover/30 rounded-lg p-4 relative">
+      <div ref={containerRef} className="bg-surface-hover/30 rounded-lg p-4 relative">
         {/* Y-axis labels */}
         <div className="absolute left-0 top-0 h-52 flex flex-col justify-between text-xs text-text-muted py-4">
           <span>{formatChartValue(maxVal, dataType, viewType)}</span>
@@ -478,14 +482,32 @@ export default function TimeSeries() {
                       height={barHeight}
                       fill={value >= 0 ? colors[filteredAssets[0]] || '#10b981' : '#ef4444'}
                       className="hover:opacity-80 transition-opacity cursor-pointer"
-                    >
-                      <title>{month.date}: {formatChartValue(value, dataType, viewType)}</title>
+                      
+                      onMouseEnter={(e) => {
+                        if (containerRef.current) {
+                          const rect = containerRef.current.getBoundingClientRect()
+                          setTooltip({
+                            visible: true,
+                            text: `${month.date}: ${formatChartValue(value, dataType, viewType)}`,
+                            x: e.clientX - rect.left,
+                            y: e.clientY - rect.top - 8
+                          })
+                        }
+                      }}
+                      onMouseMove={(e) => {
+                        if (containerRef.current) {
+                          const rect = containerRef.current.getBoundingClientRect()
+                          setTooltip(t => ({ ...t, x: e.clientX - rect.left, y: e.clientY - rect.top - 8 }))
+                        }
+                      }}
+                      onMouseLeave={() => setTooltip(t => ({ ...t, visible: false }))}
+                      >
                     </rect>
                   </g>
                 )
               } else {
                 // Stacked bars for individual investments
-                const assetValues = filteredAssets.map(asset => ({
+                const assetValues = filteredAssets.map((asset: string) => ({
                   asset,
                   value: month.assets[asset] || 0
                 }))
@@ -514,8 +536,26 @@ export default function TimeSeries() {
                           height={segmentHeight}
                           fill={colors[asset] || '#10b981'}
                           className="hover:opacity-80 transition-opacity cursor-pointer"
-                        >
-                          <title>{month.date} - {asset}: {formatChartValue(value, dataType, viewType)}</title>
+                          
+                          onMouseEnter={(e) => {
+                            if (containerRef.current) {
+                              const rect = containerRef.current.getBoundingClientRect()
+                              setTooltip({
+                                visible: true,
+                                text: `${month.date} - ${asset}: ${formatChartValue(value, dataType, viewType)}`,
+                                x: e.clientX - rect.left,
+                                y: e.clientY - rect.top - 8
+                              })
+                            }
+                          }}
+                          onMouseMove={(e) => {
+                            if (containerRef.current) {
+                              const rect = containerRef.current.getBoundingClientRect()
+                              setTooltip(t => ({ ...t, x: e.clientX - rect.left, y: e.clientY - rect.top - 8 }))
+                            }
+                          }}
+                          onMouseLeave={() => setTooltip(t => ({ ...t, visible: false }))}
+                          >
                         </rect>
                       )
                     })}
@@ -535,8 +575,26 @@ export default function TimeSeries() {
                           height={segmentHeight}
                           fill={colors[asset] || '#ef4444'}
                           className="hover:opacity-80 transition-opacity cursor-pointer"
-                        >
-                          <title>{month.date} - {asset}: {formatChartValue(value, dataType, viewType)}</title>
+                          
+                          onMouseEnter={(e) => {
+                            if (containerRef.current) {
+                              const rect = containerRef.current.getBoundingClientRect()
+                              setTooltip({
+                                visible: true,
+                                text: `${month.date} - ${asset}: ${formatChartValue(value, dataType, viewType)}`,
+                                x: e.clientX - rect.left,
+                                y: e.clientY - rect.top - 8
+                              })
+                            }
+                          }}
+                          onMouseMove={(e) => {
+                            if (containerRef.current) {
+                              const rect = containerRef.current.getBoundingClientRect()
+                              setTooltip(t => ({ ...t, x: e.clientX - rect.left, y: e.clientY - rect.top - 8 }))
+                            }
+                          }}
+                          onMouseLeave={() => setTooltip(t => ({ ...t, visible: false }))}
+                          >
                         </rect>
                       )
                     })}
@@ -545,6 +603,16 @@ export default function TimeSeries() {
               }
             })}
           </svg>
+
+          {/* Tooltip overlay */}
+          {tooltip.visible && (
+            <div
+              className="absolute px-2 py-1 text-xs bg-surface border border-border rounded text-text-primary pointer-events-none"
+              style={{ left: tooltip.x, top: tooltip.y }}
+            >
+              {tooltip.text}
+            </div>
+          )}
         </div>
 
         {/* Date labels */}
@@ -553,7 +621,7 @@ export default function TimeSeries() {
         {/* Legend */}
         {assets.length > 1 && (
           <div className="mt-4 flex flex-wrap gap-3 text-xs">
-            {assets.map((asset) => (
+            {assets.map((asset: string) => (
               <button
                 key={asset}
                 onClick={() => asset !== 'Total Portfolio' && toggleAssetVisibility(asset)}
