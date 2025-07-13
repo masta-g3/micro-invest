@@ -40,7 +40,9 @@ export default function TimeSeries() {
 
   // Transform real data instead of using mock data
   const chartData = useMemo(() => {
-    return transformSnapshots(snapshots, dataType, viewType)
+    // Limit to last 36 months for readability
+    const displaySnapshots = snapshots.length > 36 ? snapshots.slice(-36) : snapshots
+    return transformSnapshots(displaySnapshots, dataType, viewType)
   }, [snapshots, dataType, viewType])
 
 
@@ -576,7 +578,9 @@ export default function TimeSeries() {
 
   // Simple portfolio evolution data
   const portfolioEvolution = useMemo(() => {
-    return transformSnapshots(snapshots, 'portfolio', 'cumulative')
+    // Limit to last 36 months for readability
+    const displaySnapshots = snapshots.length > 36 ? snapshots.slice(-36) : snapshots
+    return transformSnapshots(displaySnapshots, 'portfolio', 'cumulative')
   }, [snapshots])
 
   const maxValue = Math.max(...portfolioEvolution.map(d => d.total))
@@ -692,6 +696,7 @@ export default function TimeSeries() {
               <div className="mt-8 pt-4 border-t border-border flex justify-between items-center">
                 <div className="text-xs text-text-muted">
                   Showing cumulative returns since {chartData[0]?.date || 'start'}
+                  {snapshots.length > 36 && ' (last 36 months)'}
                 </div>
                 <label className="flex items-center space-x-2">
                   <input 
@@ -719,6 +724,7 @@ export default function TimeSeries() {
               <div className="mt-8 pt-4 border-t border-border flex justify-between items-center">
                 <div className="text-xs text-text-muted">
                   Showing period returns from {chartData[0]?.date} to {chartData[chartData.length - 1]?.date}
+                  {snapshots.length > 36 && ' (last 36 months)'}
                 </div>
                 <label className="flex items-center space-x-2">
                   <input 
@@ -748,6 +754,7 @@ export default function TimeSeries() {
               />
               <div className="mt-8 pt-4 border-t border-border text-xs text-text-muted">
                 Showing asset allocation percentages from {chartData[0]?.date} to {chartData[chartData.length - 1]?.date}
+                {snapshots.length > 36 && ' (last 36 months)'}
               </div>
             </>
           ) : (
@@ -758,6 +765,7 @@ export default function TimeSeries() {
               />
               <div className="mt-8 pt-4 border-t border-border text-xs text-text-muted">
                 Showing portfolio value evolution from {chartData[0]?.date} to {chartData[chartData.length - 1]?.date}
+                {snapshots.length > 36 && ' (last 36 months)'}
               </div>
             </>
           )
