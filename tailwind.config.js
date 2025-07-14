@@ -5,13 +5,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#0a0a0a',
-        surface: '#141414',
-        'surface-hover': '#1a1a1a',
-        border: '#262626',
-        'text-primary': '#fafafa',
-        'text-secondary': '#a3a3a3',
-        'text-muted': '#525252',
+        // Theme-aware colors using CSS custom properties
+        background: 'var(--color-background)',
+        surface: 'var(--color-surface)',
+        'surface-hover': 'var(--color-surface-hover)',
+        border: 'var(--color-border)',
+        'text-primary': 'var(--color-text-primary)',
+        'text-secondary': 'var(--color-text-secondary)',
+        'text-muted': 'var(--color-text-muted)',
+        // Shared colors (work in both modes)
         accent: '#10b981',
         danger: '#ef4444',
         warning: '#f59e0b'

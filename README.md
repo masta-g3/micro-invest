@@ -28,6 +28,12 @@ A sleek, modern investment portfolio tracker built with React and TypeScript. Tr
 - **Data Validation** - Automatic validation and error handling
 - **Persistent Storage** - Your data is saved locally in your browser
 
+### 🎨 Theming
+- **Dark Mode** - Terminal-inspired dark theme (default)
+- **Light Mode** - Clean, bright alternative for daytime use
+- **Theme Toggle** - Switch instantly with 't' key or navigation button
+- **Persistent Preference** - Your theme choice is saved automatically
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -101,6 +107,7 @@ Use the top navigation bar or keyboard shortcuts:
 - **2** - Snapshot (detailed view)
 - **3** - Time Series (charts)
 - **4** - Add Entry (new data)
+- **t** - Toggle light/dark theme
 - **+** - Add new investment row (when in Add Entry tab)
 - **Escape** - Cancel and return to Overview (when in Add Entry tab)
 

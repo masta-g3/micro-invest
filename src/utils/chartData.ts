@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 
 export type DataType = 'returns' | 'portfolio' | 'allocation'
 export type TimeView = 'cumulative' | 'period'
+export type DisplayMode = 'percentage' | 'absolute'
 export type AssetView = 'individual' | 'total'
 
 export interface ChartDataPoint {
@@ -22,7 +23,8 @@ const formatDate = (dateStr: string): string => {
 export const transformSnapshots = (
   snapshots: PortfolioSnapshot[], 
   dataType: DataType, 
-  timeView: TimeView
+  timeView: TimeView,
+  displayMode: DisplayMode = 'percentage'
 ): ChartDataPoint[] => {
   const sortedSnapshots = [...snapshots].sort((a, b) => a.date.localeCompare(b.date))
   
@@ -30,7 +32,7 @@ export const transformSnapshots = (
 
   switch (dataType) {
     case 'returns':
-      return calculateReturns(sortedSnapshots, timeView)
+      return calculateReturns(sortedSnapshots, timeView, displayMode)
     case 'portfolio':
       return calculatePortfolioValues(sortedSnapshots, timeView)
     case 'allocation':
@@ -40,7 +42,7 @@ export const transformSnapshots = (
   }
 }
 
-const calculateReturns = (snapshots: PortfolioSnapshot[], timeView: TimeView): ChartDataPoint[] => {
+const calculateReturns = (snapshots: PortfolioSnapshot[], timeView: TimeView, displayMode: DisplayMode): ChartDataPoint[] => {
   const firstSnapshot = snapshots[0]
   
   return snapshots.map((snapshot, index) => {
@@ -48,9 +50,11 @@ const calculateReturns = (snapshots: PortfolioSnapshot[], timeView: TimeView): C
     
     if (timeView === 'cumulative') {
       // Cumulative returns since start
-      const totalReturn = firstSnapshot.netWorth !== 0 
-        ? ((snapshot.netWorth - firstSnapshot.netWorth) / Math.abs(firstSnapshot.netWorth)) * 100
-        : 0
+      const totalReturn = displayMode === 'absolute'
+        ? snapshot.netWorth - firstSnapshot.netWorth
+        : firstSnapshot.netWorth !== 0 
+          ? ((snapshot.netWorth - firstSnapshot.netWorth) / Math.abs(firstSnapshot.netWorth)) * 100
+          : 0
 
       const assets: Record<string, number> = {}
       
@@ -58,9 +62,11 @@ const calculateReturns = (snapshots: PortfolioSnapshot[], timeView: TimeView): C
       snapshot.entries.filter(e => e.amount > 0).forEach(entry => {
         const firstEntry = firstSnapshot.entries.find(e => e.investment === entry.investment)
         if (firstEntry && firstEntry.amount > 0) {
-          assets[entry.investment] = ((entry.amount - firstEntry.amount) / firstEntry.amount) * 100
+          assets[entry.investment] = displayMode === 'absolute'
+            ? entry.amount - firstEntry.amount
+            : ((entry.amount - firstEntry.amount) / firstEntry.amount) * 100
         } else {
-          assets[entry.investment] = 0 // New asset
+          assets[entry.investment] = displayMode === 'absolute' ? entry.amount : 0
         }
       })
 
@@ -68,18 +74,22 @@ const calculateReturns = (snapshots: PortfolioSnapshot[], timeView: TimeView): C
     } else {
       // Period (monthly) returns
       const prevSnapshot = index > 0 ? snapshots[index - 1] : snapshot
-      const monthlyReturn = prevSnapshot.netWorth !== 0
-        ? ((snapshot.netWorth - prevSnapshot.netWorth) / Math.abs(prevSnapshot.netWorth)) * 100
-        : 0
+      const monthlyReturn = displayMode === 'absolute'
+        ? snapshot.netWorth - prevSnapshot.netWorth
+        : prevSnapshot.netWorth !== 0
+          ? ((snapshot.netWorth - prevSnapshot.netWorth) / Math.abs(prevSnapshot.netWorth)) * 100
+          : 0
 
       const assets: Record<string, number> = {}
       
       snapshot.entries.filter(e => e.amount > 0).forEach(entry => {
         const prevEntry = prevSnapshot.entries.find(e => e.investment === entry.investment)
         if (prevEntry && prevEntry.amount > 0) {
-          assets[entry.investment] = ((entry.amount - prevEntry.amount) / prevEntry.amount) * 100
+          assets[entry.investment] = displayMode === 'absolute'
+            ? entry.amount - prevEntry.amount
+            : ((entry.amount - prevEntry.amount) / prevEntry.amount) * 100
         } else {
-          assets[entry.investment] = 0
+          assets[entry.investment] = displayMode === 'absolute' ? entry.amount : 0
         }
       })
 
@@ -162,9 +172,10 @@ export const getDataTypeLabel = (dataType: DataType): string => {
   }
 }
 
-export const getDataTypeUnit = (dataType: DataType, timeView: TimeView): string => {
+export const getDataTypeUnit = (dataType: DataType, timeView: TimeView, displayMode: DisplayMode = 'percentage'): string => {
   switch (dataType) {
-    case 'returns': return '%'
+    case 'returns': 
+      return displayMode === 'absolute' ? '$' : '%'
     case 'portfolio': 
       return timeView === 'cumulative' ? '$' : 'Δ$'
     case 'allocation': return '%'
@@ -172,8 +183,8 @@ export const getDataTypeUnit = (dataType: DataType, timeView: TimeView): string 
   }
 }
 
-export const formatChartValue = (value: number, dataType: DataType, timeView: TimeView): string => {
-  const unit = getDataTypeUnit(dataType, timeView)
+export const formatChartValue = (value: number, dataType: DataType, timeView: TimeView, displayMode: DisplayMode = 'percentage'): string => {
+  const unit = getDataTypeUnit(dataType, timeView, displayMode)
   
   if (unit.includes('$')) {
     // Format as currency

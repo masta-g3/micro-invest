@@ -77,12 +77,15 @@ function App() {
         case '4':
           updateUI({ viewMode: 'add' })
           break
+        case 't':
+          updateUI({ theme: data.ui.theme === 'dark' ? 'light' : 'dark' })
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [updateUI])
+  }, [updateUI, data.ui.theme])
 
   const renderView = () => {
     switch (viewMode) {
@@ -102,7 +105,7 @@ function App() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className={`min-h-screen bg-background flex items-center justify-center ${data.ui.theme === 'light' ? 'theme-light' : ''}`}>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-text-secondary">Loading investment data...</p>
@@ -114,7 +117,7 @@ function App() {
   // Error state
   if (error && !isInitialized) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className={`min-h-screen bg-background flex items-center justify-center ${data.ui.theme === 'light' ? 'theme-light' : ''}`}>
         <Container className="py-4 sm:py-8">
           <div className="text-center max-w-md mx-auto">
             <div className="w-12 h-12 bg-danger/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -135,7 +138,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={`min-h-screen bg-background ${data.ui.theme === 'light' ? 'theme-light' : ''}`}>
       <Container className="py-4 sm:py-8">
         {error && (
           <div className="mb-4 p-3 bg-warning/10 border border-warning/20 rounded-lg">

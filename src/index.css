@@ -3,9 +3,32 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Dark mode colors (default) */
+    --color-background: #0a0a0a;
+    --color-surface: #141414;
+    --color-surface-hover: #1a1a1a;
+    --color-border: #262626;
+    --color-text-primary: #fafafa;
+    --color-text-secondary: #a3a3a3;
+    --color-text-muted: #525252;
+  }
+  
+  .theme-light {
+    /* Light mode colors */
+    --color-background: #ffffff;
+    --color-surface: #f8f9fa;
+    --color-surface-hover: #e9ecef;
+    --color-border: #dee2e6;
+    --color-text-primary: #1f2937;
+    --color-text-secondary: #6b7280;
+    --color-text-muted: #9ca3af;
+  }
+  
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-text-primary;
     font-family: 'JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
@@ -18,21 +41,21 @@
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
   
-  /* Custom select styling to match terminal theme */
+  /* Custom select styling to match theme */
   select::-webkit-scrollbar {
     width: 8px;
   }
   
   select::-webkit-scrollbar-track {
-    background: #141414;
+    background: var(--color-surface);
   }
   
   select::-webkit-scrollbar-thumb {
-    background: #262626;
+    background: var(--color-border);
     border-radius: 4px;
   }
   
   select::-webkit-scrollbar-thumb:hover {
-    background: #1a1a1a;
+    background: var(--color-surface-hover);
   }
 }

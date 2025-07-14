@@ -5,6 +5,7 @@ import { useAppData } from '../../context/AppProvider'
 import { 
   transformSnapshots, 
   DataType, 
+  DisplayMode,
   getDataTypeLabel,
   formatChartValue 
 } from '../../utils/chartData'
@@ -12,7 +13,7 @@ import { getAssetColorMap } from '../../utils/colors'
 
 export default function TimeSeries() {
   const { data, updateUI, snapshots } = useAppData()
-  const { mainView, performanceView, ownershipView, showByAsset, visibleAssets } = data.ui.chartSettings
+  const { mainView, performanceView, ownershipView, showByAsset, displayMode, visibleAssets } = data.ui.chartSettings
   
   // Map new settings to existing logic
   const dataType = mainView === 'performance' ? 'returns' : ownershipView === 'allocation' ? 'allocation' : 'portfolio'
@@ -42,8 +43,8 @@ export default function TimeSeries() {
   const chartData = useMemo(() => {
     // Limit to last 36 months for readability
     const displaySnapshots = snapshots.length > 36 ? snapshots.slice(-36) : snapshots
-    return transformSnapshots(displaySnapshots, dataType, viewType)
-  }, [snapshots, dataType, viewType])
+    return transformSnapshots(displaySnapshots, dataType, viewType, displayMode)
+  }, [snapshots, dataType, viewType, displayMode])
 
 
   const toggleAssetVisibility = (asset: string) => {
@@ -148,12 +149,23 @@ export default function TimeSeries() {
             })
           }
           break
+        case 'd':
+          // Toggle display mode (only available in Performance view)
+          if (mainView === 'performance') {
+            updateUI({
+              chartSettings: {
+                ...data.ui.chartSettings,
+                displayMode: displayMode === 'percentage' ? 'absolute' : 'percentage'
+              }
+            })
+          }
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [data.ui.viewMode, data.ui.chartSettings, mainView, showByAsset, updateUI])
+  }, [data.ui.viewMode, data.ui.chartSettings, mainView, showByAsset, displayMode, updateUI])
 
 
   const ToggleButton = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
@@ -235,9 +247,9 @@ export default function TimeSeries() {
       <div className="bg-surface-hover/30 rounded-lg p-4 relative">
         {/* Y-axis labels */}
         <div className="absolute left-0 top-0 h-52 flex flex-col justify-between text-xs text-text-muted py-4">
-          <span>{formatChartValue(maxVal, dataType, viewType)}</span>
-          <span>{formatChartValue((maxVal + minVal) / 2, dataType, viewType)}</span>
-          <span>{formatChartValue(minVal, dataType, viewType)}</span>
+          <span>{formatChartValue(maxVal, dataType, viewType, displayMode)}</span>
+          <span>{formatChartValue((maxVal + minVal) / 2, dataType, viewType, displayMode)}</span>
+          <span>{formatChartValue(minVal, dataType, viewType, displayMode)}</span>
         </div>
 
         {/* Chart area */}
@@ -273,7 +285,7 @@ export default function TimeSeries() {
                       fill={colors[asset] || '#10b981'}
                       className="hover:r-4 transition-all duration-200 cursor-pointer"
                     >
-                      <title>{point.date}: {formatChartValue(point.value, dataType, viewType)}</title>
+                      <title>{point.date}: {formatChartValue(point.value, dataType, viewType, displayMode)}</title>
                     </circle>
                   ))}
                 </g>
@@ -443,9 +455,9 @@ export default function TimeSeries() {
       <div ref={containerRef} className="bg-surface-hover/30 rounded-lg p-4 relative">
         {/* Y-axis labels */}
         <div className="absolute left-0 top-0 h-52 flex flex-col justify-between text-xs text-text-muted py-4">
-          <span>{formatChartValue(maxVal, dataType, viewType)}</span>
-          <span>{formatChartValue(0, dataType, viewType)}</span>
-          <span>{formatChartValue(minVal, dataType, viewType)}</span>
+          <span>{formatChartValue(maxVal, dataType, viewType, displayMode)}</span>
+          <span>{formatChartValue(0, dataType, viewType, displayMode)}</span>
+          <span>{formatChartValue(minVal, dataType, viewType, displayMode)}</span>
         </div>
 
         {/* Chart area */}
@@ -488,7 +500,7 @@ export default function TimeSeries() {
                           const rect = containerRef.current.getBoundingClientRect()
                           setTooltip({
                             visible: true,
-                            text: `${month.date}: ${formatChartValue(value, dataType, viewType)}`,
+                            text: `${month.date}: ${formatChartValue(value, dataType, viewType, displayMode)}`,
                             x: e.clientX - rect.left,
                             y: e.clientY - rect.top - 8
                           })
@@ -540,12 +552,12 @@ export default function TimeSeries() {
                           onMouseEnter={(e) => {
                             if (containerRef.current) {
                               const rect = containerRef.current.getBoundingClientRect()
-                              setTooltip({
-                                visible: true,
-                                text: `${month.date} - ${asset}: ${formatChartValue(value, dataType, viewType)}`,
-                                x: e.clientX - rect.left,
-                                y: e.clientY - rect.top - 8
-                              })
+                                                          setTooltip({
+                              visible: true,
+                              text: `${month.date} - ${asset}: ${formatChartValue(value, dataType, viewType, displayMode)}`,
+                              x: e.clientX - rect.left,
+                              y: e.clientY - rect.top - 8
+                            })
                             }
                           }}
                           onMouseMove={(e) => {
@@ -581,7 +593,7 @@ export default function TimeSeries() {
                               const rect = containerRef.current.getBoundingClientRect()
                               setTooltip({
                                 visible: true,
-                                text: `${month.date} - ${asset}: ${formatChartValue(value, dataType, viewType)}`,
+                                text: `${month.date} - ${asset}: ${formatChartValue(value, dataType, viewType, displayMode)}`,
                                 x: e.clientX - rect.left,
                                 y: e.clientY - rect.top - 8
                               })
@@ -766,21 +778,37 @@ export default function TimeSeries() {
                   Showing cumulative returns since {chartData[0]?.date || 'start'}
                   {snapshots.length > 36 && ' (last 36 months)'}
                 </div>
-                <label className="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    checked={showByAsset}
-                    onChange={(e) => updateUI({
+                <div className="flex items-center space-x-6">
+                  <ViewToggle
+                    options={[
+                      { value: 'percentage', label: '%', shortcut: 'd' },
+                      { value: 'absolute', label: '$', shortcut: 'd' }
+                    ]}
+                    value={displayMode}
+                    onChange={(value) => updateUI({
                       chartSettings: {
                         ...data.ui.chartSettings,
-                        showByAsset: e.target.checked
+                        displayMode: value as DisplayMode
                       }
                     })}
-                    className="rounded border-border text-accent focus:ring-accent"
+                    className="scale-75"
                   />
-                  <span className="text-xs text-text-secondary">Show by asset</span>
-                  <span className="text-xs text-text-muted">a</span>
-                </label>
+                  <label className="flex items-center space-x-2">
+                    <input 
+                      type="checkbox" 
+                      checked={showByAsset}
+                      onChange={(e) => updateUI({
+                        chartSettings: {
+                          ...data.ui.chartSettings,
+                          showByAsset: e.target.checked
+                        }
+                      })}
+                      className="rounded border-border text-accent focus:ring-accent"
+                    />
+                    <span className="text-xs text-text-secondary">Show by asset</span>
+                    <span className="text-xs text-text-muted">a</span>
+                  </label>
+                </div>
               </div>
             </>
           ) : (
@@ -794,21 +822,37 @@ export default function TimeSeries() {
                   Showing period returns from {chartData[0]?.date} to {chartData[chartData.length - 1]?.date}
                   {snapshots.length > 36 && ' (last 36 months)'}
                 </div>
-                <label className="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    checked={showByAsset}
-                    onChange={(e) => updateUI({
+                <div className="flex items-center space-x-6">
+                  <ViewToggle
+                    options={[
+                      { value: 'percentage', label: '%', shortcut: 'd' },
+                      { value: 'absolute', label: '$', shortcut: 'd' }
+                    ]}
+                    value={displayMode}
+                    onChange={(value) => updateUI({
                       chartSettings: {
                         ...data.ui.chartSettings,
-                        showByAsset: e.target.checked
+                        displayMode: value as DisplayMode
                       }
                     })}
-                    className="rounded border-border text-accent focus:ring-accent"
+                    className="scale-75"
                   />
-                  <span className="text-xs text-text-secondary">Show by asset</span>
-                  <span className="text-xs text-text-muted">a</span>
-                </label>
+                  <label className="flex items-center space-x-2">
+                    <input 
+                      type="checkbox" 
+                      checked={showByAsset}
+                      onChange={(e) => updateUI({
+                        chartSettings: {
+                          ...data.ui.chartSettings,
+                          showByAsset: e.target.checked
+                        }
+                      })}
+                      className="rounded border-border text-accent focus:ring-accent"
+                    />
+                    <span className="text-xs text-text-secondary">Show by asset</span>
+                    <span className="text-xs text-text-muted">a</span>
+                  </label>
+                </div>
               </div>
             </>
           )

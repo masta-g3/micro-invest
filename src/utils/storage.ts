@@ -5,6 +5,7 @@ interface ChartSettings {
   performanceView: 'cumulative' | 'period'
   ownershipView: 'allocation' | 'value'
   showByAsset: boolean
+  displayMode: 'percentage' | 'absolute'
   visibleAssets: string[]
 }
 
@@ -22,6 +23,7 @@ export interface AppData {
   ui: {
     selectedDate: string | null
     viewMode: ViewMode
+    theme: 'dark' | 'light'
     chartSettings: ChartSettings
     formData: FormData
   }
@@ -34,11 +36,13 @@ const defaultData: AppData = {
   ui: {
     selectedDate: null,
     viewMode: 'overview',
+    theme: 'dark',
     chartSettings: {
       mainView: 'performance',
       performanceView: 'cumulative',
       ownershipView: 'allocation',
       showByAsset: false,
+      displayMode: 'percentage',
       visibleAssets: []
     },
     formData: {
