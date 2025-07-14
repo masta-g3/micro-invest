@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import Card from '../layout/Card'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { useAppData } from '../../context/AppProvider'
 import { formatCurrency, formatPercentage, calculateInsight } from '../../utils/calculations'
 import { format } from 'date-fns'
+import ImportDialog from '../ui/ImportDialog'
 
 export default function Overview() {
-  const { snapshots, getLatestSnapshot, getAvailableDates } = useAppData()
+  const { snapshots, getLatestSnapshot, getAvailableDates, updateUI } = useAppData()
+  const [showImportDialog, setShowImportDialog] = useState(false)
 
   const latestSnapshot = getLatestSnapshot()
   const availableDates = getAvailableDates().slice(0, 5) // Get 5 most recent dates
@@ -17,12 +20,26 @@ export default function Overview() {
     return calculateInsight(latestSnapshot, previousSnapshot)
   })() : null
 
-  // Fallback to default values if no data
+  // Clean empty state for power users
   if (!latestSnapshot) {
     return (
-      <div className="text-center py-12">
-        <p className="text-text-muted">No investment data available</p>
-      </div>
+      <Card className="text-center py-16">
+        <h2 className="text-xl text-text-secondary mb-4">No investment data yet</h2>
+        <div className="flex justify-center gap-4">
+          <button 
+            onClick={() => updateUI({ viewMode: 'add' })}
+            className="px-4 py-2 bg-accent text-background rounded-lg hover:bg-accent/80 transition-colors"
+          >
+            Add Entry
+          </button>
+          <button 
+            onClick={() => setShowImportDialog(true)}
+            className="px-4 py-2 border border-border rounded-lg hover:bg-surface-hover transition-colors"
+          >
+            Import CSV
+          </button>
+        </div>
+      </Card>
     )
   }
 
@@ -135,6 +152,12 @@ export default function Overview() {
           )}
         </div>
       </Card>
+      
+      {/* Import Dialog */}
+      <ImportDialog 
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+      />
     </div>
   )
 }

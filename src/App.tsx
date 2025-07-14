@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useAppData } from './context/AppProvider'
-import { loadCSVFromFile } from './utils/csv'
 import Container from './components/layout/Container'
 import Navigation from './components/layout/Navigation'
 import Overview from './components/views/Overview'
@@ -15,37 +14,10 @@ function App() {
   const isInitialized = data.entries.length > 0
   const { viewMode } = data.ui
 
+  // App starts with localStorage data only - no automatic CSV loading
   useEffect(() => {
-    const initializeData = async () => {
-      if (data.entries.length > 0) return
-      
-      setIsLoading(true)
-      setError(null)
-      
-      try {
-        const result = await loadCSVFromFile('/investments.csv')
-        
-        if (result.errors.length > 0) {
-          console.warn('CSV parsing warnings:', result.errors)
-          setError(`Data loaded with warnings: ${result.errors.slice(0, 3).join(', ')}${result.errors.length > 3 ? '...' : ''}`)
-        }
-        
-        if (result.data.length > 0) {
-          updateData({ entries: result.data })
-          console.log(`Loaded ${result.data.length} investment entries from CSV`)
-        } else {
-          setError('No data found in CSV file')
-        }
-      } catch (error) {
-        console.error('Failed to load investment data:', error)
-        setError('Failed to load investment data. Please check the CSV file.')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    
-    initializeData()
-  }, [data.entries.length, updateData])
+    setIsLoading(false)
+  }, [])
   
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {

@@ -70,9 +70,9 @@ export default function Snapshot() {
 
   if (!snapshot) {
     return (
-      <div className="text-center py-12">
-        <p className="text-text-muted">No snapshot data available</p>
-      </div>
+      <Card className="text-center py-16">
+        <p className="text-text-secondary mb-4">No data available. Add entries to see analysis.</p>
+      </Card>
     )
   }
 
