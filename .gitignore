@@ -7,3 +7,7 @@ package-lock.json
 *.png
 PLANNING.md
 CHANGES.md
+
+# Personal data files
+public/investments.csv
+*.csv
