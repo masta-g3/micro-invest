@@ -110,6 +110,7 @@ export const AppStorage = {
         ui: {
           selectedDate: state.selectedDate || null,
           viewMode: state.viewMode || 'overview',
+          theme: 'dark',
           chartSettings: defaultData.ui.chartSettings,
           formData: defaultData.ui.formData
         }

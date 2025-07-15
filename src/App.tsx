@@ -8,9 +8,9 @@ import TimeSeries from './components/views/TimeSeries'
 import AddEntry from './components/views/AddEntry'
 
 function App() {
-  const { data, updateUI, updateData } = useAppData()
+  const { data, updateUI } = useAppData()
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error] = useState<string | null>(null)
   const isInitialized = data.entries.length > 0
   const { viewMode } = data.ui
 

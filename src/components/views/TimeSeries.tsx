@@ -4,7 +4,6 @@ import ViewToggle from '../ui/ViewToggle'
 import { useAppData } from '../../context/AppProvider'
 import { 
   transformSnapshots, 
-  DataType, 
   DisplayMode,
   getDataTypeLabel,
   formatChartValue 
@@ -168,18 +167,7 @@ export default function TimeSeries() {
   }, [data.ui.viewMode, data.ui.chartSettings, mainView, showByAsset, displayMode, updateUI])
 
 
-  const ToggleButton = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1 text-xs rounded transition-colors ${
-        active 
-          ? 'bg-accent text-background' 
-          : 'bg-surface-hover text-text-secondary hover:text-text-primary'
-      }`}
-    >
-      {children}
-    </button>
-  )
+
 
   // Shared component for chart date labels
   const ChartDateLabels = ({ data }: { data: any[] }) => (
@@ -366,7 +354,7 @@ export default function TimeSeries() {
               })
               
               // Create bottom line (previous asset's top line)
-              const bottomPoints = stackedData.map((d, index) => {
+              const bottomPoints = stackedData.map((_, index) => {
                 const x = (index / (stackedData.length - 1)) * 600
                 const prevAssetIndex = filteredAssets.indexOf(asset) - 1
                 const prevValue = prevAssetIndex >= 0 ? 
