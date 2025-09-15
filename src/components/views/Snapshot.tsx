@@ -1,16 +1,20 @@
 import { useState } from 'react'
 import Card from '../layout/Card'
-import { ChevronLeft, ChevronRight, Lightbulb, Edit3, Check, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Lightbulb, Edit3, Check, X, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppProvider'
 import { formatCurrency, formatPercentage, calculateInsight } from '../../utils/calculations'
 import { format } from 'date-fns'
 import { InvestmentEntry } from '../../types'
+import { useToast } from '../../hooks/useToast'
+import Button from '../ui/Button'
 
 export default function Snapshot() {
-  const { data, updateUI, snapshots, getAvailableDates, updateEntry } = useAppData()
+  const { data, updateUI, snapshots, getAvailableDates, updateEntry, deleteEntry, addEntry } = useAppData()
+  const { toast } = useToast()
   const selectedDate = data.ui.selectedDate
   const [editingEntry, setEditingEntry] = useState<InvestmentEntry | null>(null)
   const [editValues, setEditValues] = useState({ amount: '', rate: '' })
+  const [confirmDelete, setConfirmDelete] = useState<InvestmentEntry | null>(null)
 
   const availableDates = getAvailableDates()
   const currentDate = selectedDate || (availableDates.length > 0 ? availableDates[0] : null)
@@ -47,6 +51,25 @@ export default function Snapshot() {
   const cancelEdit = () => {
     setEditingEntry(null)
     setEditValues({ amount: '', rate: '' })
+  }
+
+  const handleDelete = (entry: InvestmentEntry) => {
+    const backup = { ...entry }
+    deleteEntry(entry.date, entry.investment)
+    setConfirmDelete(null)
+
+    toast(
+      `Deleted ${entry.investment}`,
+      'success',
+      {
+        label: 'Undo',
+        handler: () => addEntry(backup)
+      }
+    )
+  }
+
+  const cancelDelete = () => {
+    setConfirmDelete(null)
   }
 
   const saveEdit = () => {
@@ -139,10 +162,13 @@ export default function Snapshot() {
             <tbody>
               {entriesWithChanges.map((entry, index) => {
                 const isEditing = editingEntry?.date === entry.date && editingEntry?.investment === entry.investment
-                
+                const isDeleting = confirmDelete?.date === entry.date && confirmDelete?.investment === entry.investment
+
                 return (
-                  <tr key={index} className={`border-b border-border last:border-b-0 ${
-                    isEditing ? 'bg-surface-hover/50' : 'hover:bg-surface-hover/30'
+                  <tr key={index} className={`border-b border-border last:border-b-0 transition-all duration-200 ${
+                    isDeleting ? 'bg-danger/5 scale-[0.98]' :
+                    isEditing ? 'bg-surface-hover/50 shadow-sm' :
+                    'opacity-85 hover:opacity-100 hover:bg-surface-hover/30'
                   }`}>
                     <td className="py-3 text-text-primary font-medium">{entry.investment}</td>
                     
@@ -187,7 +213,16 @@ export default function Snapshot() {
                     
                     {/* Actions Column */}
                     <td className="py-3 text-center">
-                      {isEditing ? (
+                      {confirmDelete?.date === entry.date && confirmDelete?.investment === entry.investment ? (
+                        <div className="flex items-center justify-center space-x-1">
+                          <Button size="sm" onClick={() => handleDelete(entry)}>
+                            Delete
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={cancelDelete}>
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : isEditing ? (
                         <div className="flex items-center justify-center space-x-1">
                           <button
                             onClick={saveEdit}
@@ -195,6 +230,13 @@ export default function Snapshot() {
                             title="Save changes"
                           >
                             <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(entry)}
+                            className="p-1 text-danger hover:bg-danger/10 rounded transition-colors"
+                            title="Delete entry"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={cancelEdit}

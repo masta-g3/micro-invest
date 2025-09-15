@@ -31,13 +31,14 @@ micro-invest/
 │   └── investments.csv          # Sample data file
 ├── src/
 │   ├── components/
-│   │   ├── charts/             # Chart components (future)
 │   │   ├── layout/             # Layout components
 │   │   │   ├── Card.tsx        # Reusable card wrapper
 │   │   │   ├── Container.tsx   # Page container
-│   │   │   └── Navigation.tsx  # Main navigation
+│   │   │   └── Navigation.tsx  # Main navigation with theme toggle
 │   │   ├── ui/                 # UI components
-│   │   │   └── ViewToggle.tsx  # Toggle switch component
+│   │   │   ├── DataControls.tsx    # Export/import controls with dropdown
+│   │   │   ├── ImportDialog.tsx    # CSV import modal dialog
+│   │   │   └── ViewToggle.tsx      # Toggle switch component
 │   │   └── views/              # Page components
 │   │       ├── AddEntry.tsx    # Data entry form
 │   │       ├── Overview.tsx    # Dashboard view
@@ -45,7 +46,9 @@ micro-invest/
 │   │       └── TimeSeries.tsx  # Charts view
 │   ├── context/
 │   │   └── AppProvider.tsx     # Global state management
-│   ├── hooks/                  # Custom React hooks (future)
+│   ├── hooks/                  # Custom React hooks
+│   │   ├── useDataImport.ts    # CSV import logic
+│   │   └── useToast.ts         # Toast notification system
 │   ├── types/
 │   │   └── index.ts           # TypeScript type definitions
 │   ├── utils/
@@ -56,7 +59,8 @@ micro-invest/
 │   │   └── storage.ts         # LocalStorage management
 │   ├── App.tsx                # Main app component
 │   ├── main.tsx               # React entry point
-│   └── index.css              # Global styles
+│   ├── index.css              # Global styles
+│   └── vite-env.d.ts          # Vite type definitions
 └── Configuration files...
 ```
 
@@ -148,19 +152,30 @@ interface AppData {
   ui: {
     selectedDate: string | null
     viewMode: 'overview' | 'snapshot' | 'timeseries' | 'add'
+    theme: 'dark' | 'light'
     chartSettings: ChartSettings
     formData: FormData
   }
 }
+
+interface ChartSettings {
+  mainView: 'performance' | 'ownership'
+  performanceView: 'cumulative' | 'period'
+  ownershipView: 'allocation' | 'value'
+  showByAsset: boolean
+  displayMode: 'percentage' | 'absolute'
+  visibleAssets: string[]
+}
 ```
 
 ### Data Processing Pipeline
-1. **CSV Import** → `csv.ts` → Parsed entries
-2. **Validation** → `calculations.ts` → Validated data
+1. **CSV Import** → `useDataImport.ts` + `csv.ts` → Parsed entries
+2. **Validation** → `csv.ts` → Validated data with error reporting
 3. **Snapshots** → `AppProvider.tsx` → Computed snapshots
 4. **Metrics** → `calculations.ts` → Financial metrics
 5. **Charts** → `chartData.ts` → Chart-ready data
 6. **Storage** → `storage.ts` → LocalStorage persistence
+7. **Notifications** → `useToast.ts` → User feedback
 
 ## 🧩 Component Architecture
 
@@ -176,7 +191,13 @@ interface AppData {
 - **Card.tsx**: Reusable card component
 
 ### Utility Components (`src/components/ui/`)
+- **DataControls.tsx**: Export/import dropdown with toast notifications
+- **ImportDialog.tsx**: Modal dialog for CSV file import with validation
 - **ViewToggle.tsx**: Toggle switch for chart options
+
+### Custom Hooks (`src/hooks/`)
+- **useDataImport.ts**: CSV import logic with error handling
+- **useToast.ts**: Toast notification system with auto-dismiss
 
 ## 🧮 Financial Calculations
 
@@ -233,6 +254,66 @@ Located in `src/utils/colors.ts`:
 - Support for light/dark themes
 - Accessibility-friendly color choices
 
+## 🎯 User Experience Features
+
+### Theme System
+- **Dark/Light Mode**: Toggle via Navigation UI or keyboard shortcut
+- **Persistent Storage**: Theme preference saved in localStorage
+- **CSS Variables**: Consistent theming across components
+- **Keyboard Shortcut**: `t` key for quick theme switching
+
+### Toast Notifications
+Located in `src/hooks/useToast.ts`:
+
+```typescript
+interface Toast {
+  id: string
+  message: string
+  type: 'success' | 'error'
+}
+
+export const useToast = () => {
+  const { toasts, toast, dismiss } = useToast()
+
+  // Usage
+  toast('Export successful!', 'success')
+  toast('Import failed', 'error')
+}
+```
+
+**Features**:
+- Auto-dismiss after 3 seconds
+- Manual dismiss with close button
+- Success/error styling
+- Multiple toast support
+
+### CSV Import/Export System
+
+#### Import Flow
+```mermaid
+graph LR
+    A[File Upload] --> B[CSV Parsing]
+    B --> C[Validation]
+    C --> D{Valid?}
+    D -->|Yes| E[Merge/Replace Data]
+    D -->|No| F[Show Errors]
+    E --> G[Success Toast]
+    F --> H[Error Toast]
+```
+
+#### Export Features
+- **Automatic Filename**: `micro-invest-YYYY-MM-DD.csv`
+- **Complete Data**: All entries with proper formatting
+- **Error Handling**: Toast notifications for success/failure
+
+### Keyboard Shortcuts
+- **`1`**: Overview view
+- **`2`**: Snapshot view
+- **`3`**: TimeSeries view
+- **`4`**: Add Entry view
+- **`t`**: Toggle theme
+- **Smart Detection**: Disabled when typing in input fields
+
 ## 💾 Storage System
 
 ### LocalStorage Management
@@ -282,7 +363,7 @@ import { useAppData } from '../../context/AppProvider'
 
 export default function NewView() {
   const { data, updateUI } = useAppData()
-  
+
   return (
     <div className="space-y-6">
       {/* Your component */}
@@ -316,6 +397,63 @@ const renderView = () => {
 ```typescript
 // src/types/index.ts
 export type ViewMode = 'overview' | 'snapshot' | 'timeseries' | 'add' | 'newview'
+```
+
+### Adding UI Components with Notifications
+
+#### With Toast Notifications
+```typescript
+// Component with toast feedback
+import { useToast } from '../../hooks/useToast'
+
+export default function ComponentWithFeedback() {
+  const { toast } = useToast()
+
+  const handleAction = async () => {
+    try {
+      await performAction()
+      toast('Action completed successfully!', 'success')
+    } catch (error) {
+      toast('Action failed. Please try again.', 'error')
+    }
+  }
+
+  return (
+    <button onClick={handleAction}>
+      Perform Action
+    </button>
+  )
+}
+```
+
+#### With Data Import
+```typescript
+// Component that imports data
+import { useDataImport } from '../../hooks/useDataImport'
+
+export default function DataImporter() {
+  const { importCSV } = useDataImport()
+
+  const handleFileImport = async (file: File) => {
+    const result = await importCSV(file, 'merge')
+    if (result.success) {
+      console.log(`Imported ${result.count} entries`)
+    } else {
+      console.error('Import failed:', result.errors)
+    }
+  }
+
+  return (
+    <input
+      type="file"
+      accept=".csv"
+      onChange={(e) => {
+        const file = e.target.files?.[0]
+        if (file) handleFileImport(file)
+      }}
+    />
+  )
+}
 ```
 
 ### Adding New Calculations
@@ -479,31 +617,49 @@ export default defineConfig({
 
 ## 🔄 Migration Notes
 
-### From Zustand to Context API
-- **Completed**: Basic state management migration
+### From Zustand to Context API ✅
+- **Completed**: Full state management migration
 - **Storage**: Automatic migration from `investment-storage` to `micro-invest-data`
-- **API**: New `useAppData` hook replaces Zustand selectors
+- **API**: `useAppData` hook provides complete state access
+- **Features Added**: Theme system, enhanced UI state management
 
-### Future Migrations
-- Consider React Query for server state (if needed)
-- Potential move to Jotai or Valtio for complex state
-- Database integration for multi-user support
+### Current Architecture Benefits
+- **Lightweight**: No external state management dependencies
+- **Type Safe**: Full TypeScript integration
+- **Persistent**: LocalStorage with migration support
+- **Modular**: Clean separation of concerns
 
 ---
 
 ## 📚 Learning Resources
 
 ### Key Concepts to Understand
-1. **React Context API**: Global state management
-2. **decimal.js**: Precise financial calculations
-3. **Recharts**: Chart library usage
-4. **Tailwind CSS**: Utility-first styling
-5. **TypeScript**: Type safety and interfaces
+1. **React Context API**: Global state management with hooks
+2. **Custom Hooks**: `useToast`, `useDataImport` for reusable logic
+3. **decimal.js**: Precise financial calculations
+4. **CSV Processing**: PapaParse with validation
+5. **Theme System**: CSS variables with localStorage persistence
+6. **Recharts**: Chart library with responsive design
+7. **Tailwind CSS**: Utility-first styling with custom CSS variables
+8. **TypeScript**: Comprehensive type safety
 
 ### Recommended Reading
 - [React Context API Best Practices](https://react.dev/learn/passing-data-deeply-with-context)
+- [Custom Hooks Guide](https://react.dev/learn/reusing-logic-with-custom-hooks)
 - [Financial Calculations in JavaScript](https://github.com/MikeMcl/decimal.js/)
+- [PapaParse CSV Library](https://www.papaparse.com/)
 - [Recharts Documentation](https://recharts.org/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
 
-This structure document should be updated as the project evolves. Keep it current with any architectural changes or new patterns introduced. 
+### Architecture Summary
+This micro-invest app follows a **minimalist, modular architecture** with:
+- **No external state management** (pure React Context)
+- **Custom hooks** for cross-cutting concerns
+- **Comprehensive TypeScript** for type safety
+- **LocalStorage persistence** with migration support
+- **Toast notifications** for user feedback
+- **CSV import/export** with validation
+- **Dark/light theming** with persistence
+- **Keyboard shortcuts** for power users
+
+The codebase prioritizes **clean, readable code** over corporate complexity, making it maintainable by lean teams while providing a robust financial tracking experience. 

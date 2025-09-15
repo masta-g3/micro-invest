@@ -5,6 +5,7 @@ import { useAppData } from '../../context/AppProvider'
 import { formatCurrency, formatPercentage, calculateInsight } from '../../utils/calculations'
 import { format } from 'date-fns'
 import ImportDialog from '../ui/ImportDialog'
+import Button from '../ui/Button'
 
 export default function Overview() {
   const { snapshots, getLatestSnapshot, getAvailableDates, updateUI } = useAppData()
@@ -26,18 +27,12 @@ export default function Overview() {
       <Card className="text-center py-16">
         <h2 className="text-xl text-text-secondary mb-4">No investment data yet</h2>
         <div className="flex justify-center gap-4">
-          <button 
-            onClick={() => updateUI({ viewMode: 'add' })}
-            className="px-4 py-2 bg-accent text-background rounded-lg hover:bg-accent/80 transition-colors"
-          >
+          <Button onClick={() => updateUI({ viewMode: 'add' })}>
             Add Entry
-          </button>
-          <button 
-            onClick={() => setShowImportDialog(true)}
-            className="px-4 py-2 border border-border rounded-lg hover:bg-surface-hover transition-colors"
-          >
+          </Button>
+          <Button variant="secondary" onClick={() => setShowImportDialog(true)}>
             Import CSV
-          </button>
+          </Button>
         </div>
       </Card>
     )
@@ -77,12 +72,12 @@ export default function Overview() {
 
   return (
     <div className="space-y-8">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-text-primary">Net Worth</h1>
-        <p className="text-4xl font-bold text-accent">
+      <div className="text-center space-y-3">
+        <h1 className="text-2xl font-medium text-text-secondary tracking-wide">Net Worth</h1>
+        <p className="text-5xl font-black text-accent tracking-tight leading-none">
           {formatCurrency(latestSnapshot.netWorth)}
         </p>
-        <div className="flex items-center justify-center space-x-2">
+        <div className="flex items-center justify-center space-x-2 opacity-80 hover:opacity-100 transition-opacity">
           {insight && insight.monthlyChange !== 0 && (
             <>
               {insight.monthlyChange >= 0 ? (
@@ -90,23 +85,23 @@ export default function Overview() {
               ) : (
                 <TrendingDown className="w-4 h-4 text-danger" />
               )}
-              <span className={insight.monthlyChange >= 0 ? 'text-accent' : 'text-danger'}>
+              <span className={`text-sm font-medium ${insight.monthlyChange >= 0 ? 'text-accent' : 'text-danger'}`}>
                 {formatPercentage(insight.monthlyChange)} this month
               </span>
             </>
           )}
           {(!insight || insight.monthlyChange === 0) && (
-            <span className="text-text-muted">No change data available</span>
+            <span className="text-sm text-text-muted">No change data available</span>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+        <Card className="transition-all duration-200 hover:shadow-md opacity-90 hover:opacity-100">
           <h3 className="text-lg font-semibold text-text-primary mb-4">Top Performers</h3>
           <div className="space-y-3">
             {topPerformers.length > 0 ? topPerformers.map((performer: any, index: number) => (
-              <div key={index} className="flex justify-between items-center">
+              <div key={index} className="flex justify-between items-center py-1 hover:bg-surface-hover/30 rounded px-2 -mx-2 transition-colors">
                 <span className="text-text-secondary">{performer.name}</span>
                 <span className="text-accent font-semibold">{formatPercentage(performer.growth)}</span>
               </div>
@@ -116,17 +111,17 @@ export default function Overview() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="transition-all duration-200 hover:shadow-md opacity-90 hover:opacity-100">
           <h3 className="text-lg font-semibold text-text-primary mb-4">Asset Allocation</h3>
           <div className="space-y-3">
             {allocationData.length > 0 ? allocationData.map((asset, index) => (
-              <div key={index} className="space-y-1">
+              <div key={index} className="space-y-1 hover:bg-surface-hover/30 rounded px-2 py-1 -mx-2 transition-colors">
                 <div className="flex justify-between items-center">
                   <span className="text-text-secondary">{asset.name}</span>
                   <span className="text-text-primary font-medium">{asset.percentage}%</span>
                 </div>
                 <div className="w-full bg-surface-hover rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-accent h-2 rounded-full transition-all duration-300"
                     style={{ width: `${Math.min(asset.percentage, 100)}%` }}
                   />
@@ -139,11 +134,11 @@ export default function Overview() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="transition-all duration-200 hover:shadow-md opacity-90 hover:opacity-100">
         <h3 className="text-lg font-semibold text-text-primary mb-4">Recent Activity</h3>
         <div className="space-y-2">
           {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
-            <div key={index} className="flex items-center space-x-2">
+            <div key={index} className="flex items-center space-x-2 py-1 hover:bg-surface-hover/30 rounded px-2 -mx-2 transition-colors">
               <span className="w-2 h-2 bg-accent rounded-full"></span>
               <span className="text-text-secondary">{activity}</span>
             </div>

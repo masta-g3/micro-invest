@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MoreVertical, Download, Upload, X } from 'lucide-react'
+import { MoreVertical, Download, Upload } from 'lucide-react'
 import { useAppData } from '../../context/AppProvider'
 import { exportToCSV, downloadCSV } from '../../utils/csv'
 import { useToast } from '../../hooks/useToast'
@@ -9,7 +9,7 @@ export default function DataControls() {
   const [showMenu, setShowMenu] = useState(false)
   const [showImportDialog, setShowImportDialog] = useState(false)
   const { data } = useAppData()
-  const { toasts, toast, dismiss } = useToast()
+  const { toast } = useToast()
 
   const handleExport = () => {
     try {
@@ -67,37 +67,10 @@ export default function DataControls() {
         </>
       )}
       
-      {/* Import Dialog */}
-      <ImportDialog 
+      <ImportDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
       />
-      
-      {/* Toast Notifications */}
-      {toasts.length > 0 && (
-        <div className="fixed top-4 right-4 z-50 space-y-2">
-          {toasts.map(toast => (
-            <div
-              key={toast.id}
-              className={`p-3 rounded-lg shadow-lg border max-w-sm transition-all duration-300 ${
-                toast.type === 'error' 
-                  ? 'bg-danger/10 border-danger/20 text-danger' 
-                  : 'bg-accent/10 border-accent/20 text-accent'
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                <span className="text-sm font-medium flex-1">{toast.message}</span>
-                <button 
-                  onClick={() => dismiss(toast.id)}
-                  className="text-current opacity-70 hover:opacity-100 transition-opacity"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 } 

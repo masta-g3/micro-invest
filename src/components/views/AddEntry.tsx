@@ -2,14 +2,12 @@ import { useEffect } from 'react'
 import Card from '../layout/Card'
 import { Plus, X } from 'lucide-react'
 import { useAppData } from '../../context/AppProvider'
+import { INVESTMENT_OPTIONS } from '../../constants'
+import Button from '../ui/Button'
 
 export default function AddEntry() {
   const { data, updateUI, addEntry: saveEntry } = useAppData()
   const { date, entries } = data.ui.formData
-
-  const investmentOptions = [
-    'Wealthfront', 'IRA', 'Robinhood', 'CETES', 'Crypto', 'Real Estate', 'Roth IRA', 'Debt'
-  ]
 
   const addEntry = () => {
     updateUI({
@@ -151,7 +149,7 @@ export default function AddEntry() {
                     }}
                   >
                     <option value="" className="bg-background text-text-primary">Select investment...</option>
-                    {investmentOptions.map((option) => (
+                    {INVESTMENT_OPTIONS.map((option) => (
                       <option key={option} value={option} className="bg-background text-text-primary">{option}</option>
                     ))}
                   </select>
@@ -201,22 +199,16 @@ export default function AddEntry() {
           </div>
 
           <div className="pt-4 border-t border-border">
-            <button
-              onClick={prefillFromPrevious}
-              className="px-4 py-2 bg-surface-hover hover:bg-border text-text-primary rounded-lg transition-colors"
-            >
+            <Button variant="ghost" onClick={prefillFromPrevious}>
               Load June 2025 values
-            </button>
+            </Button>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4 border-t border-border">
-            <button 
-              onClick={handleCancel}
-              className="px-6 py-2 text-text-secondary hover:text-text-primary transition-colors"
-            >
+            <Button variant="ghost" onClick={handleCancel}>
               Cancel
-            </button>
-            <button 
+            </Button>
+            <Button
               onClick={() => {
                 entries.forEach(entry => {
                   if (entry.investment && entry.amount && entry.rate) {
@@ -235,10 +227,9 @@ export default function AddEntry() {
                   }
                 })
               }}
-              className="px-6 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg transition-colors"
             >
               Save Entry
-            </button>
+            </Button>
           </div>
         </div>
       </Card>

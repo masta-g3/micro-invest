@@ -1,22 +1,4 @@
-import { InvestmentEntry, ViewMode } from '../types'
-
-interface ChartSettings {
-  mainView: 'performance' | 'ownership'
-  performanceView: 'cumulative' | 'period'
-  ownershipView: 'allocation' | 'value'
-  showByAsset: boolean
-  displayMode: 'percentage' | 'absolute'
-  visibleAssets: string[]
-}
-
-interface FormData {
-  date: string
-  entries: Array<{
-    investment: string
-    amount: string
-    rate: string
-  }>
-}
+import { InvestmentEntry, ViewMode, ChartSettings, FormData } from '../types'
 
 export interface AppData {
   entries: InvestmentEntry[]

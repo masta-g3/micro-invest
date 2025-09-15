@@ -1,14 +1,7 @@
 import { useCallback } from 'react'
 import { useAppData } from '../context/AppProvider'
 import { parseCSVFile } from '../utils/csv'
-import { InvestmentEntry } from '../types'
-
-interface ImportResult {
-  success: boolean
-  data?: InvestmentEntry[]
-  errors?: string[]
-  count?: number
-}
+import { ImportResult } from '../types'
 
 export const useDataImport = () => {
   const { data, updateData } = useAppData()
@@ -21,9 +14,9 @@ export const useDataImport = () => {
       const result = await parseCSVFile(file)
       
       if (result.errors.length > 0) {
-        return { 
-          success: false, 
-          errors: result.errors.slice(0, 5) // Limit to first 5 errors for clean UI
+        return {
+          success: false,
+          errors: result.errors.slice(0, 5)
         }
       }
       

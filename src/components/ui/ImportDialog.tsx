@@ -1,16 +1,13 @@
 import { useState } from 'react'
-import { X, Upload } from 'lucide-react'
+import { Upload } from 'lucide-react'
 import { useDataImport } from '../../hooks/useDataImport'
+import { ImportResult } from '../../types'
+import Modal from './Modal'
+import Button from './Button'
 
 interface ImportDialogProps {
   isOpen: boolean
   onClose: () => void
-}
-
-interface ImportResult {
-  success: boolean
-  errors?: string[]
-  count?: number
 }
 
 export default function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
@@ -42,31 +39,9 @@ export default function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
     setFile(null)
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-50" 
-        onClick={onClose}
-      />
-      
-      {/* Dialog */}
-      <div className="relative bg-surface border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-lg">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-text-primary">Import CSV Data</h2>
-          <button 
-            onClick={onClose}
-            className="p-1 text-text-secondary hover:text-text-primary transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        
-        {/* Content */}
-        {result?.success ? (
+    <Modal isOpen={isOpen} onClose={onClose} title="Import CSV Data">
+      {result?.success ? (
           /* Success State */
           <div className="text-center py-4">
             <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -92,18 +67,12 @@ export default function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
             </div>
             
             <div className="flex gap-3">
-              <button 
-                onClick={handleReset}
-                className="flex-1 border border-border rounded-lg py-2 text-text-secondary hover:text-text-primary transition-colors"
-              >
+              <Button variant="secondary" onClick={handleReset} className="flex-1">
                 Try Again
-              </button>
-              <button 
-                onClick={onClose}
-                className="flex-1 bg-accent text-background rounded-lg py-2 hover:bg-accent/80 transition-colors"
-              >
+              </Button>
+              <Button onClick={onClose} className="flex-1">
                 Close
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -131,23 +100,19 @@ export default function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
             </div>
             
             <div className="flex gap-3">
-              <button 
-                onClick={onClose}
-                className="flex-1 border border-border rounded-lg py-2 text-text-secondary hover:text-text-primary transition-colors"
-              >
+              <Button variant="secondary" onClick={onClose} className="flex-1">
                 Cancel
-              </button>
-              <button 
+              </Button>
+              <Button
                 onClick={handleImport}
                 disabled={!file || importing}
-                className="flex-1 bg-accent text-background rounded-lg py-2 hover:bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1"
               >
                 {importing ? 'Importing...' : 'Import'}
-              </button>
+              </Button>
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   )
 } 

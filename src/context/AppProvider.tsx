@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
 import { AppData, AppStorage } from '../utils/storage'
-import { InvestmentEntry } from '../types'
+import { InvestmentEntry, PortfolioSnapshot } from '../types'
 import { calculateSnapshot } from '../utils/calculations'
 
 interface AppContextType {
@@ -11,15 +11,9 @@ interface AppContextType {
   updateEntry: (oldEntry: InvestmentEntry, newEntry: InvestmentEntry) => void
   deleteEntry: (date: string, investment: string) => void
   clearData: () => void
-  snapshots: Array<{
-    date: string
-    entries: InvestmentEntry[]
-    totalValue: number
-    totalDebt: number
-    netWorth: number
-  }>
+  snapshots: PortfolioSnapshot[]
   getAvailableDates: () => string[]
-  getLatestSnapshot: () => any
+  getLatestSnapshot: () => PortfolioSnapshot | null
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
