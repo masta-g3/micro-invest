@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Card from '../layout/Card'
 import { ChevronLeft, ChevronRight, Lightbulb, Edit3, Check, X, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppProvider'
-import { formatCurrency, formatPercentage, calculateInsight, calculateActualReturn } from '../../utils/calculations'
+import { formatCurrency, formatPercentage, calculateInsight, calculateActualReturn, annualizedToMonthly } from '../../utils/calculations'
 import { format } from 'date-fns'
 import { InvestmentEntry } from '../../types'
 import { useToast } from '../../hooks/useToast'
@@ -17,8 +17,18 @@ export default function Snapshot() {
   const [confirmDelete, setConfirmDelete] = useState<InvestmentEntry | null>(null)
 
   const availableDates = getAvailableDates()
-  const currentDate = selectedDate || (availableDates.length > 0 ? availableDates[0] : null)
+
+  // Fix: If selectedDate doesn't exist in available dates, use the first available date
+  const validSelectedDate = selectedDate && availableDates.includes(selectedDate) ? selectedDate : null
+  const currentDate = validSelectedDate || (availableDates.length > 0 ? availableDates[0] : null)
   const snapshot = currentDate ? snapshots.find(s => s.date === currentDate) : null
+
+  // If we found a mismatch and corrected it, update the UI
+  React.useEffect(() => {
+    if (selectedDate && !availableDates.includes(selectedDate) && availableDates.length > 0) {
+      updateUI({ selectedDate: availableDates[0] })
+    }
+  }, [selectedDate, availableDates, updateUI])
   
   // Calculate insight for current snapshot
   const insight = snapshot ? (() => {
@@ -201,17 +211,24 @@ export default function Snapshot() {
                           placeholder="Rate"
                         />
                       ) : (
-                        <div className="space-y-1">
-                          <div className={`text-sm font-medium ${
-                            entry.actualReturn !== null ?
-                              entry.actualReturn > 0 ? 'text-accent' :
-                              entry.actualReturn < 0 ? 'text-danger' : 'text-text-secondary'
-                            : 'text-text-muted'
-                          }`}>
-                            {entry.actualReturn !== null ? formatPercentage(entry.actualReturn, 1) : '—'}
+                        <div className="space-y-2">
+                          <div className="space-y-1">
+                            <div className={`text-sm font-medium ${
+                              entry.actualReturn !== null ?
+                                entry.actualReturn > 0 ? 'text-accent' :
+                                entry.actualReturn < 0 ? 'text-danger' : 'text-text-secondary'
+                              : 'text-text-muted'
+                            }`}>
+                              {entry.actualReturn !== null ? formatPercentage(entry.actualReturn, 1) : '—'}
+                            </div>
+                            <div className="text-xs text-text-muted">
+                              Actual (monthly)
+                            </div>
                           </div>
-                          <div className="text-xs text-text-muted">
-                            Expected: {formatPercentage(entry.rate, 1).replace('+', '')}
+                          <div className="pt-2 border-t border-border/30">
+                            <div className="text-xs text-text-muted">
+                              Expected (monthly): {formatPercentage(annualizedToMonthly(entry.rate), 1).replace('+', '')}
+                            </div>
                           </div>
                         </div>
                       )}

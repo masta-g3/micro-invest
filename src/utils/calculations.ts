@@ -332,4 +332,10 @@ export const calculateActualReturn = (
 ): number | null => {
   if (!previousAmount || previousAmount === 0) return null
   return ((currentAmount - previousAmount) / Math.abs(previousAmount)) * 100
-} 
+}
+
+export const annualizedToMonthly = (annualRate: number): number => {
+  // Convert annualized rate to monthly equivalent
+  // Formula: (1 + annual/100)^(1/12) - 1) * 100
+  return (Math.pow(1 + annualRate / 100, 1/12) - 1) * 100
+}
