@@ -11,6 +11,37 @@ import {
 } from '../../utils/chartData'
 import { getAssetColorMap } from '../../utils/colors'
 
+interface YAxisLabelsProps {
+  values: number[]
+  formatValue: (value: number) => string
+  chartHeight: number
+  minVal: number
+  maxVal: number
+}
+
+const YAxisLabels = ({ values, formatValue, chartHeight, minVal, maxVal }: YAxisLabelsProps) => {
+  const range = maxVal - minVal
+
+  return (
+    <div className="absolute left-0 top-0 h-full flex flex-col text-xs text-text-muted" style={{ height: chartHeight }}>
+      {values.map((value, index) => {
+        const position = range > 0 ? (maxVal - value) / range : 0.5
+        const pixelPosition = position * chartHeight
+
+        return (
+          <span
+            key={index}
+            className="absolute -translate-y-1/2"
+            style={{ top: `${pixelPosition}px` }}
+          >
+            {formatValue(value)}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function TimeSeries() {
   const { data, updateUI, snapshots } = useAppData()
   const { mainView, performanceView, ownershipView, showByAsset, displayMode, visibleAssets } = data.ui.chartSettings
@@ -294,11 +325,13 @@ export default function TimeSeries() {
     return (
       <div className="bg-surface-hover/30 rounded-lg p-4 relative">
         {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 h-52 flex flex-col justify-between text-xs text-text-muted py-4">
-          <span>{formatChartValue(maxVal, dataType, viewType, displayMode)}</span>
-          <span>{formatChartValue(0, dataType, viewType, displayMode)}</span>
-          <span>{formatChartValue(minVal, dataType, viewType, displayMode)}</span>
-        </div>
+        <YAxisLabels
+          values={[maxVal, ...(minVal < 0 && maxVal > 0 ? [0] : []), minVal]}
+          formatValue={(value) => formatChartValue(value, dataType, viewType, displayMode)}
+          chartHeight={chartHeight}
+          minVal={minVal}
+          maxVal={maxVal}
+        />
 
         {/* Chart area */}
         <div className="ml-12 h-52 relative" ref={containerRef}>
@@ -452,11 +485,13 @@ export default function TimeSeries() {
     return (
       <div className="bg-surface-hover/30 rounded-lg p-4 relative">
         {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 h-52 flex flex-col justify-between text-xs text-text-muted py-4">
-          <span>${(maxValue / 1000).toFixed(0)}k</span>
-          <span>${(maxValue / 2 / 1000).toFixed(0)}k</span>
-          <span>$0</span>
-        </div>
+        <YAxisLabels
+          values={[maxValue, maxValue / 2, 0]}
+          formatValue={(value) => `$${(value / 1000).toFixed(0)}k`}
+          chartHeight={200}
+          minVal={0}
+          maxVal={maxValue}
+        />
 
         {/* Chart area */}
         <div className="ml-12 h-52 relative">
@@ -573,11 +608,13 @@ export default function TimeSeries() {
     return (
       <div ref={containerRef} className="bg-surface-hover/30 rounded-lg p-4 relative">
         {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 h-52 flex flex-col justify-between text-xs text-text-muted py-4">
-          <span>{formatChartValue(maxVal, dataType, viewType, displayMode)}</span>
-          <span>{formatChartValue(0, dataType, viewType, displayMode)}</span>
-          <span>{formatChartValue(minVal, dataType, viewType, displayMode)}</span>
-        </div>
+        <YAxisLabels
+          values={[maxVal, ...(minVal < 0 && maxVal > 0 ? [0] : []), minVal]}
+          formatValue={(value) => formatChartValue(value, dataType, viewType, displayMode)}
+          chartHeight={chartHeight}
+          minVal={minVal}
+          maxVal={maxVal}
+        />
 
         {/* Chart area */}
         <div className="ml-12 h-52 relative">
