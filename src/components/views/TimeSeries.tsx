@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useState, useRef } from 'react'
+import type { ReactNode } from 'react'
 import Card from '../layout/Card'
 import ViewToggle from '../ui/ViewToggle'
 import { useAppData } from '../../context/AppProvider'
@@ -397,7 +398,7 @@ export default function TimeSeries() {
 
         {/* Legend */}
         <div className="mt-4 flex flex-col gap-2 text-xs">
-          <LegendControls assetsList={availableAssets} />
+          <LegendControls />
           <div className="flex flex-wrap gap-4">
           {assets.map((asset: string) => (
             <button
@@ -497,7 +498,7 @@ export default function TimeSeries() {
 
         {/* Legend */}
         <div className="mt-4 flex flex-col gap-2 text-xs">
-          <LegendControls assetsList={availableAssets} />
+          <LegendControls />
           <div className="flex flex-wrap gap-3">
           {filteredAssets.map((asset) => (
             <button
@@ -522,7 +523,8 @@ export default function TimeSeries() {
   // Vertical bar chart for monthly performance
   const MonthlyBars = ({ data, assets }: { data: any[], assets: string[] }) => {
     // Tooltip state
-    const [tooltip, setTooltip] = useState<{ x: number; y: number; content: React.ReactNode; visible: boolean }>({ x: 0, y: 0, content: '', visible: false })
+    // Local per-rect hover content (setter reused for positioning during hover)
+    const [, setTooltip] = useState<{ x: number; y: number; content: ReactNode; visible: boolean }>({ x: 0, y: 0, content: null, visible: false })
     const containerRef = useRef<HTMLDivElement>(null)
     const [hoverState, setHoverState] = useState<{ x: number; index: number; visible: boolean }>({ x: 0, index: 0, visible: false })
 
@@ -792,7 +794,7 @@ export default function TimeSeries() {
         {/* Legend */}
         {assets.length > 1 && (
           <div className="mt-4 flex flex-col gap-2 text-xs">
-            <LegendControls assetsList={availableAssets} />
+            <LegendControls />
             <div className="flex flex-wrap gap-3">
             {assets.map((asset: string) => (
               <button
