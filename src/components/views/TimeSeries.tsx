@@ -13,6 +13,8 @@ import { getAssetColorMap } from '../../utils/colors'
 export default function TimeSeries() {
   const { data, updateUI, snapshots } = useAppData()
   const { mainView, performanceView, ownershipView, showByAsset, displayMode, visibleAssets } = data.ui.chartSettings
+  const assetsInitialized = useRef(false)
+  const previousSelectionRef = useRef<string[] | null>(null)
   
   // Map new settings to existing logic
   const dataType = mainView === 'performance' ? 'returns' : ownershipView === 'allocation' ? 'allocation' : 'portfolio'
@@ -24,8 +26,8 @@ export default function TimeSeries() {
     return assets.sort()
   }, [data.entries])
   
-  const visibleAssetsSet = useMemo(() => {
-    if (visibleAssets.length === 0 && availableAssets.length > 0) {
+  useEffect(() => {
+    if (!assetsInitialized.current && visibleAssets.length === 0 && availableAssets.length > 0) {
       const initialAssets = availableAssets.slice(0, 4)
       updateUI({
         chartSettings: {
@@ -33,10 +35,14 @@ export default function TimeSeries() {
           visibleAssets: initialAssets
         }
       })
-      return new Set(initialAssets)
+      assetsInitialized.current = true
     }
-    return new Set(visibleAssets)
+    if (visibleAssets.length > 0 && !assetsInitialized.current) {
+      assetsInitialized.current = true
+    }
   }, [visibleAssets, availableAssets, data.ui.chartSettings, updateUI])
+
+  const visibleAssetsSet = useMemo(() => new Set(visibleAssets), [visibleAssets])
 
   // Transform real data instead of using mock data
   const chartData = useMemo(() => {
@@ -60,6 +66,42 @@ export default function TimeSeries() {
       }
     })
   }
+
+  const setVisibleAssets = (assets: string[]) => {
+    updateUI({
+      chartSettings: {
+        ...data.ui.chartSettings,
+        visibleAssets: assets
+      }
+    })
+  }
+
+  const selectAllAssets = () => setVisibleAssets(availableAssets)
+  const selectNoneAssets = () => setVisibleAssets([])
+  const invertAssets = () => {
+    const inverted = availableAssets.filter(a => !visibleAssetsSet.has(a))
+    setVisibleAssets(inverted)
+  }
+
+  const isolateAsset = (asset: string) => {
+    if (asset === 'Total Portfolio') return
+    const isIsolated = visibleAssets.length === 1 && visibleAssets[0] === asset
+    if (isIsolated) {
+      setVisibleAssets(previousSelectionRef.current || [])
+      previousSelectionRef.current = null
+    } else {
+      previousSelectionRef.current = visibleAssets
+      setVisibleAssets([asset])
+    }
+  }
+
+  const LegendControls = () => (
+    <div className="flex items-center gap-2 text-xs mb-2">
+      <button onClick={selectAllAssets} className="px-2 py-0.5 rounded bg-surface-hover hover:bg-surface border border-border text-text-secondary">All</button>
+      <button onClick={selectNoneAssets} className="px-2 py-0.5 rounded bg-surface-hover hover:bg-surface border border-border text-text-secondary">None</button>
+      <button onClick={invertAssets} className="px-2 py-0.5 rounded bg-surface-hover hover:bg-surface border border-border text-text-secondary">Invert</button>
+    </div>
+  )
 
   // Add keyboard shortcuts for chart controls
   useEffect(() => {
@@ -186,6 +228,9 @@ export default function TimeSeries() {
     // Generate dynamic color mapping for all available assets
     const colors = getAssetColorMap([...availableAssets, 'Total Portfolio'])
 
+    const containerRef = useRef<HTMLDivElement>(null)
+    const [hoverState, setHoverState] = useState<{ index: number; x: number; visible: boolean }>({ index: 0, x: 0, visible: false })
+
     // For cumulative view, data is already cumulative
     // For period view, we need to calculate cumulative values for line chart
     const cumulativeData = data.map((month, index) => {
@@ -215,34 +260,76 @@ export default function TimeSeries() {
     })
 
     const allValues = cumulativeData.flatMap(d => filteredAssets.map(asset => d[asset]))
-    
-    // For allocation view, fix the scale to 0-100%
-    let maxVal, minVal, range
+
+    // Domain that always includes 0 for returns
+    let maxVal: number, minVal: number
+    const includeZero = dataType !== 'allocation'
     if (dataType === 'allocation') {
       maxVal = 100
       minVal = 0
-      range = 100
     } else {
-      maxVal = Math.max(...allValues)
-      minVal = Math.min(...allValues)
-      range = maxVal - minVal || 1 // Prevent division by zero
+      maxVal = Math.max(...allValues, includeZero ? 0 : -Infinity)
+      minVal = Math.min(...allValues, includeZero ? 0 : Infinity)
+      const padding = Math.max((maxVal - minVal) * 0.05, 1e-6)
+      maxVal += padding
+      minVal -= padding
     }
+    const range = maxVal - minVal || 1
 
     const chartWidth = 600 // Fixed width for calculations
     const chartHeight = 200 // Fixed height for calculations
+
+    const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+      if (!containerRef.current || cumulativeData.length === 0) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const localX = Math.max(0, Math.min(chartWidth, e.clientX - rect.left))
+      const ratio = cumulativeData.length > 1 ? localX / chartWidth : 0
+      const index = Math.max(0, Math.min(cumulativeData.length - 1, Math.round(ratio * (cumulativeData.length - 1))))
+      setHoverState({ index, x: localX, visible: true })
+    }
+
+    const handleMouseLeave = () => setHoverState(s => ({ ...s, visible: false }))
 
     return (
       <div className="bg-surface-hover/30 rounded-lg p-4 relative">
         {/* Y-axis labels */}
         <div className="absolute left-0 top-0 h-52 flex flex-col justify-between text-xs text-text-muted py-4">
           <span>{formatChartValue(maxVal, dataType, viewType, displayMode)}</span>
-          <span>{formatChartValue((maxVal + minVal) / 2, dataType, viewType, displayMode)}</span>
+          <span>{formatChartValue(0, dataType, viewType, displayMode)}</span>
           <span>{formatChartValue(minVal, dataType, viewType, displayMode)}</span>
         </div>
 
         {/* Chart area */}
-        <div className="ml-12 h-52 relative">
-          <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none">
+        <div className="ml-12 h-52 relative" ref={containerRef}>
+          <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
+            {/* Horizontal gridlines */}
+            {[0.25, 0.5, 0.75].map((p) => (
+              <line key={p} x1="0" x2={chartWidth} y1={chartHeight * p} y2={chartHeight * p} stroke="#2f2f2f" strokeWidth="1" strokeDasharray="1,3" />
+            ))}
+            {/* Zero baseline */}
+            {includeZero && (
+              <line
+                x1="0"
+                y1={chartHeight - ((0 - minVal) / range * chartHeight)}
+                x2={chartWidth}
+                y2={chartHeight - ((0 - minVal) / range * chartHeight)}
+                stroke="#525252"
+                strokeWidth="1"
+                strokeDasharray="2,2"
+              />
+            )}
+            {/* Crosshair */}
+            {hoverState.visible && (
+              <line
+                x1={hoverState.x}
+                y1={0}
+                x2={hoverState.x}
+                y2={chartHeight}
+                stroke="#6b7280"
+                strokeWidth="1"
+                strokeDasharray="3,3"
+              />
+            )}
             {filteredAssets.map((asset) => {
               const pathPoints = cumulativeData.map((d, index) => {
                 const x = (index / (cumulativeData.length - 1)) * chartWidth
@@ -280,17 +367,43 @@ export default function TimeSeries() {
               )
             })}
           </svg>
+          {/* Grouped tooltip */}
+          {hoverState.visible && cumulativeData[hoverState.index] && (
+            <div
+              className="absolute bg-surface border border-border rounded px-2 py-1 text-xs text-text-primary pointer-events-none"
+              style={{ left: Math.min(Math.max(hoverState.x + 8, 0), chartWidth - 120), top: 8 }}
+            >
+              <div className="font-medium mb-1 text-text-secondary">{cumulativeData[hoverState.index].date}</div>
+              {(() => {
+                const d = cumulativeData[hoverState.index]
+                const rows = filteredAssets.map(name => ({ name, value: d[name] as number }))
+                  .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+                return rows.map(row => (
+                  <div key={row.name} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded" style={{ backgroundColor: colors[row.name] || '#10b981' }} />
+                      <span className="text-text-secondary">{row.name}</span>
+                    </div>
+                    <span>{formatChartValue(row.value, dataType, viewType, displayMode)}</span>
+                  </div>
+                ))
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Date labels */}
         <ChartDateLabels data={cumulativeData} />
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-4 text-xs">
+        <div className="mt-4 flex flex-col gap-2 text-xs">
+          <LegendControls assetsList={availableAssets} />
+          <div className="flex flex-wrap gap-4">
           {assets.map((asset: string) => (
             <button
               key={asset}
               onClick={() => asset !== 'Total Portfolio' && toggleAssetVisibility(asset)}
+              onDoubleClick={() => asset !== 'Total Portfolio' && isolateAsset(asset)}
               className={`flex items-center space-x-2 transition-opacity ${
                 asset === 'Total Portfolio' ? 'cursor-default' : 'cursor-pointer hover:opacity-80'
               } ${
@@ -304,6 +417,7 @@ export default function TimeSeries() {
               <span className="text-text-secondary">{asset}</span>
             </button>
           ))}
+          </div>
         </div>
       </div>
     )
@@ -382,11 +496,14 @@ export default function TimeSeries() {
         <ChartDateLabels data={stackedData} />
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-3 text-xs">
+        <div className="mt-4 flex flex-col gap-2 text-xs">
+          <LegendControls assetsList={availableAssets} />
+          <div className="flex flex-wrap gap-3">
           {filteredAssets.map((asset) => (
             <button
               key={asset}
               onClick={() => toggleAssetVisibility(asset)}
+              onDoubleClick={() => isolateAsset(asset)}
               className="flex items-center space-x-1.5 transition-opacity cursor-pointer hover:opacity-80"
             >
               <div 
@@ -396,6 +513,7 @@ export default function TimeSeries() {
               <span className="text-text-secondary text-xs">{asset}</span>
             </button>
           ))}
+          </div>
         </div>
       </div>
     )
@@ -404,8 +522,9 @@ export default function TimeSeries() {
   // Vertical bar chart for monthly performance
   const MonthlyBars = ({ data, assets }: { data: any[], assets: string[] }) => {
     // Tooltip state
-    const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; visible: boolean }>({ x: 0, y: 0, text: '', visible: false })
+    const [tooltip, setTooltip] = useState<{ x: number; y: number; content: React.ReactNode; visible: boolean }>({ x: 0, y: 0, content: '', visible: false })
     const containerRef = useRef<HTMLDivElement>(null)
+    const [hoverState, setHoverState] = useState<{ x: number; index: number; visible: boolean }>({ x: 0, index: 0, visible: false })
 
     const filteredAssets = assets.filter(asset => 
       asset === 'Total Portfolio' || visibleAssetsSet.has(asset)
@@ -439,6 +558,16 @@ export default function TimeSeries() {
     // Calculate zero line position based on actual data range
     const zeroLine = minVal < 0 ? chartHeight * (maxVal / actualRange) : chartHeight
 
+    const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+      if (!containerRef.current || data.length === 0) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const localX = Math.max(0, Math.min(chartWidth, e.clientX - rect.left))
+      const idx = Math.max(0, Math.min(data.length - 1, Math.round((localX / chartWidth) * (data.length - 1))))
+      setHoverState({ x: localX, index: idx, visible: true })
+    }
+
+    const handleMouseLeave = () => setHoverState(s => ({ ...s, visible: false }))
+
     return (
       <div ref={containerRef} className="bg-surface-hover/30 rounded-lg p-4 relative">
         {/* Y-axis labels */}
@@ -450,7 +579,11 @@ export default function TimeSeries() {
 
         {/* Chart area */}
         <div className="ml-12 h-52 relative">
-          <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none">
+          <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
+            {/* Horizontal gridlines */}
+            {[0.25, 0.5, 0.75].map((p) => (
+              <line key={p} x1="0" x2={chartWidth} y1={chartHeight * p} y2={chartHeight * p} stroke="#2f2f2f" strokeWidth="1" strokeDasharray="1,3" />
+            ))}
             {/* Zero line */}
             <line
               x1="0"
@@ -461,6 +594,10 @@ export default function TimeSeries() {
               strokeWidth="1"
               strokeDasharray="2,2"
             />
+            {/* Crosshair */}
+            {hoverState.visible && (
+              <line x1={hoverState.x} y1={0} x2={hoverState.x} y2={chartHeight} stroke="#6b7280" strokeWidth="1" strokeDasharray="3,3" />
+            )}
             
             {/* Bars */}
             {data.map((month, monthIndex) => {
@@ -488,7 +625,13 @@ export default function TimeSeries() {
                           const rect = containerRef.current.getBoundingClientRect()
                           setTooltip({
                             visible: true,
-                            text: `${month.date}: ${formatChartValue(value, dataType, viewType, displayMode)}`,
+                            content: (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-block w-2 h-2 rounded" style={{ backgroundColor: colors[filteredAssets[0]] || '#10b981' }} />
+                                <span className="text-text-secondary">{filteredAssets[0]}</span>
+                                <span>{formatChartValue(value, dataType, viewType, displayMode)}</span>
+                              </div>
+                            ),
                             x: e.clientX - rect.left,
                             y: e.clientY - rect.top - 8
                           })
@@ -540,12 +683,18 @@ export default function TimeSeries() {
                           onMouseEnter={(e) => {
                             if (containerRef.current) {
                               const rect = containerRef.current.getBoundingClientRect()
-                                                          setTooltip({
-                              visible: true,
-                              text: `${month.date} - ${asset}: ${formatChartValue(value, dataType, viewType, displayMode)}`,
-                              x: e.clientX - rect.left,
-                              y: e.clientY - rect.top - 8
-                            })
+                              setTooltip({
+                                visible: true,
+                                content: (
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-block w-2 h-2 rounded" style={{ backgroundColor: colors[asset] || '#10b981' }} />
+                                    <span className="text-text-secondary">{asset}</span>
+                                    <span>{formatChartValue(value, dataType, viewType, displayMode)}</span>
+                                  </div>
+                                ),
+                                x: e.clientX - rect.left,
+                                y: e.clientY - rect.top - 8
+                              })
                             }
                           }}
                           onMouseMove={(e) => {
@@ -581,7 +730,13 @@ export default function TimeSeries() {
                               const rect = containerRef.current.getBoundingClientRect()
                               setTooltip({
                                 visible: true,
-                                text: `${month.date} - ${asset}: ${formatChartValue(value, dataType, viewType, displayMode)}`,
+                                content: (
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-block w-2 h-2 rounded" style={{ backgroundColor: colors[asset] || '#ef4444' }} />
+                                    <span className="text-text-secondary">{asset}</span>
+                                    <span>{formatChartValue(value, dataType, viewType, displayMode)}</span>
+                                  </div>
+                                ),
                                 x: e.clientX - rect.left,
                                 y: e.clientY - rect.top - 8
                               })
@@ -604,13 +759,29 @@ export default function TimeSeries() {
             })}
           </svg>
 
-          {/* Tooltip overlay */}
-          {tooltip.visible && (
+          {/* Grouped tooltip: month + visible series for hovered index */}
+          {hoverState.visible && data[hoverState.index] && (
             <div
               className="absolute px-2 py-1 text-xs bg-surface border border-border rounded text-text-primary pointer-events-none"
-              style={{ left: tooltip.x, top: tooltip.y }}
+              style={{ left: Math.min(Math.max(hoverState.x + 8, 0), chartWidth - 140), top: 8 }}
             >
-              {tooltip.text}
+              <div className="font-medium mb-1 text-text-secondary">{data[hoverState.index].date}</div>
+              {(() => {
+                const month = data[hoverState.index]
+                const rows = (filteredAssets[0] === 'Total Portfolio' && filteredAssets.length === 1)
+                  ? [{ name: 'Total Portfolio', value: month.total }]
+                  : filteredAssets.map(name => ({ name, value: month.assets[name] || 0 }))
+                rows.sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+                return rows.map(r => (
+                  <div key={r.name} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded" style={{ backgroundColor: colors[r.name] || '#10b981' }} />
+                      <span className="text-text-secondary">{r.name}</span>
+                    </div>
+                    <span>{formatChartValue(r.value, dataType, viewType, displayMode)}</span>
+                  </div>
+                ))
+              })()}
             </div>
           )}
         </div>
@@ -620,11 +791,14 @@ export default function TimeSeries() {
 
         {/* Legend */}
         {assets.length > 1 && (
-          <div className="mt-4 flex flex-wrap gap-3 text-xs">
+          <div className="mt-4 flex flex-col gap-2 text-xs">
+            <LegendControls assetsList={availableAssets} />
+            <div className="flex flex-wrap gap-3">
             {assets.map((asset: string) => (
               <button
                 key={asset}
                 onClick={() => asset !== 'Total Portfolio' && toggleAssetVisibility(asset)}
+                onDoubleClick={() => asset !== 'Total Portfolio' && isolateAsset(asset)}
                 className={`flex items-center space-x-1.5 transition-opacity ${
                   asset === 'Total Portfolio' ? 'cursor-default' : 'cursor-pointer hover:opacity-80'
                 } ${
@@ -638,6 +812,7 @@ export default function TimeSeries() {
                 <span className="text-text-secondary text-xs">{asset}</span>
               </button>
             ))}
+            </div>
           </div>
         )}
       </div>
@@ -793,7 +968,7 @@ export default function TimeSeries() {
                       })}
                       className="rounded border-border text-accent focus:ring-accent"
                     />
-                    <span className="text-xs text-text-secondary">Show by asset</span>
+                    <span className="text-xs text-text-secondary">Split by asset</span>
                     <span className="text-xs text-text-muted">a</span>
                   </label>
                 </div>
@@ -837,7 +1012,7 @@ export default function TimeSeries() {
                       })}
                       className="rounded border-border text-accent focus:ring-accent"
                     />
-                    <span className="text-xs text-text-secondary">Show by asset</span>
+                    <span className="text-xs text-text-secondary">Split by asset</span>
                     <span className="text-xs text-text-muted">a</span>
                   </label>
                 </div>
