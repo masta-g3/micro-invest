@@ -6,7 +6,7 @@ import { INVESTMENT_OPTIONS } from '../../constants'
 import Button from '../ui/Button'
 
 export default function AddEntry() {
-  const { data, updateUI, addEntry: saveEntry } = useAppData()
+  const { data, updateUI, addEntry: saveEntry, getLatestSnapshot } = useAppData()
   const { date, entries } = data.ui.formData
 
   const addEntry = () => {
@@ -40,20 +40,19 @@ export default function AddEntry() {
   }
 
   const prefillFromPrevious = () => {
-    const mockPreviousData = [
-      { investment: 'Real Estate', amount: '231504', rate: '5' },
-      { investment: 'IRA', amount: '221104', rate: '5' },
-      { investment: 'Wealthfront', amount: '113521', rate: '4' },
-      { investment: 'Robinhood', amount: '64650', rate: '7' },
-      { investment: 'CETES', amount: '55142', rate: '8' },
-      { investment: 'Crypto', amount: '7642', rate: '5' },
-      { investment: 'Roth IRA', amount: '7000', rate: '7' },
-      { investment: 'Debt', amount: '-124145', rate: '0' }
-    ]
+    const latestSnapshot = getLatestSnapshot()
+    if (!latestSnapshot) return
+
+    const previousData = latestSnapshot.entries.map(entry => ({
+      investment: entry.investment,
+      amount: entry.amount.toString(),
+      rate: entry.rate.toString()
+    }))
+
     updateUI({
       formData: {
         ...data.ui.formData,
-        entries: mockPreviousData
+        entries: previousData
       }
     })
   }
@@ -198,11 +197,17 @@ export default function AddEntry() {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-border">
-            <Button variant="ghost" onClick={prefillFromPrevious}>
-              Load June 2025 values
-            </Button>
-          </div>
+          {getLatestSnapshot() && (
+            <div className="pt-4 border-t border-border">
+              <Button variant="ghost" onClick={prefillFromPrevious}>
+                Load values from {new Date(getLatestSnapshot()!.date).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </Button>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 pt-4 border-t border-border">
             <Button variant="ghost" onClick={handleCancel}>
