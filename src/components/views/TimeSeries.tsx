@@ -558,7 +558,7 @@ export default function TimeSeries() {
     const barGroupWidth = chartWidth / data.length
     
     // Calculate zero line position based on actual data range
-    const zeroLine = minVal < 0 ? chartHeight * (maxVal / actualRange) : chartHeight
+    const zeroLine = minVal < 0 ? chartHeight - ((0 - minVal) / actualRange * chartHeight) : chartHeight
 
     const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
       if (!containerRef.current || data.length === 0) return
@@ -609,8 +609,10 @@ export default function TimeSeries() {
               if (filteredAssets.length === 1 || filteredAssets[0] === 'Total Portfolio') {
                 // Single bar for total portfolio
                 const value = filteredAssets[0] === 'Total Portfolio' ? month.total : (month.assets[filteredAssets[0]] || 0)
-                const barHeight = Math.abs(value - (value >= 0 ? 0 : minVal)) / actualRange * chartHeight
-                const barY = value >= 0 ? zeroLine - ((value - 0) / actualRange * chartHeight) : zeroLine
+                const zeroPosition = chartHeight - ((0 - minVal) / actualRange * chartHeight)
+                const valuePosition = chartHeight - ((value - minVal) / actualRange * chartHeight)
+                const barHeight = Math.abs(zeroPosition - valuePosition)
+                const barY = value >= 0 ? valuePosition : zeroPosition
 
                 return (
                   <g key={`${monthIndex}-${filteredAssets[0]}`}>
@@ -668,8 +670,9 @@ export default function TimeSeries() {
                   <g key={`${monthIndex}-stacked`}>
                     {/* Positive stack */}
                     {positiveValues.map(({ asset, value }) => {
+                      const zeroPosition = chartHeight - ((0 - minVal) / actualRange * chartHeight)
                       const segmentHeight = (value / actualRange) * chartHeight
-                      const segmentY = zeroLine - positiveOffset - segmentHeight
+                      const segmentY = zeroPosition - positiveOffset - segmentHeight
                       positiveOffset += segmentHeight
 
                       return (
@@ -713,8 +716,9 @@ export default function TimeSeries() {
                     
                     {/* Negative stack */}
                     {negativeValues.map(({ asset, value }) => {
+                      const zeroPosition = chartHeight - ((0 - minVal) / actualRange * chartHeight)
                       const segmentHeight = (Math.abs(value) / actualRange) * chartHeight
-                      const segmentY = zeroLine + negativeOffset
+                      const segmentY = zeroPosition + negativeOffset
                       negativeOffset += segmentHeight
 
                       return (
