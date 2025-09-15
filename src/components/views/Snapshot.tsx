@@ -221,13 +221,10 @@ export default function Snapshot() {
                             }`}>
                               {entry.actualReturn !== null ? formatPercentage(entry.actualReturn, 1) : '—'}
                             </div>
-                            <div className="text-xs text-text-muted">
-                              Actual (monthly)
-                            </div>
                           </div>
                           <div className="pt-2 border-t border-border/30">
                             <div className="text-xs text-text-muted">
-                              Expected (monthly): {formatPercentage(annualizedToMonthly(entry.rate), 1).replace('+', '')}
+                              Expected: {formatPercentage(annualizedToMonthly(entry.rate), 1).replace('+', '')}
                             </div>
                           </div>
                         </div>
