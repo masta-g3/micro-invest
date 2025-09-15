@@ -287,17 +287,23 @@ export const calculateSnapshot = (entries: InvestmentEntry[], date: string): Por
 
 export const calculateInsight = (snapshot: PortfolioSnapshot, previousSnapshot?: PortfolioSnapshot) => {
   const positiveEntries = snapshot.entries.filter(entry => entry.amount > 0)
-  
-  // Find top and underperformer by rate
+
+  // Find top and underperformer by actual return
   let topPerformer = { name: '', growth: -Infinity }
   let underperformer = { name: '', growth: Infinity }
-  
+
   positiveEntries.forEach(entry => {
-    if (entry.rate > topPerformer.growth) {
-      topPerformer = { name: entry.investment, growth: entry.rate }
-    }
-    if (entry.rate < underperformer.growth) {
-      underperformer = { name: entry.investment, growth: entry.rate }
+    const previousEntry = previousSnapshot?.entries.find(e => e.investment === entry.investment)
+    const actualReturn = calculateActualReturn(entry.amount, previousEntry?.amount)
+
+    // Only consider entries with actual calculated returns
+    if (actualReturn !== null) {
+      if (actualReturn > topPerformer.growth) {
+        topPerformer = { name: entry.investment, growth: actualReturn }
+      }
+      if (actualReturn < underperformer.growth) {
+        underperformer = { name: entry.investment, growth: actualReturn }
+      }
     }
   })
   
@@ -318,4 +324,12 @@ export const calculateInsight = (snapshot: PortfolioSnapshot, previousSnapshot?:
     monthlyChange,
     allocation
   }
+}
+
+export const calculateActualReturn = (
+  currentAmount: number,
+  previousAmount: number | undefined
+): number | null => {
+  if (!previousAmount || previousAmount === 0) return null
+  return ((currentAmount - previousAmount) / Math.abs(previousAmount)) * 100
 } 

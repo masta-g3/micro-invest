@@ -50,15 +50,12 @@ export default function Overview() {
       }
     })
 
-  // Get top performers (positive rates only)
-  const topPerformers = latestSnapshot.entries
-    .filter((entry: any) => entry.amount > 0 && entry.rate > 0)
-    .sort((a: any, b: any) => b.rate - a.rate)
-    .slice(0, 3)
-    .map((entry: any) => ({
-      name: entry.investment,
-      growth: entry.rate
-    }))
+  // Get top performers based on actual returns
+  const topPerformers = insight ?
+    [insight.topPerformer]
+      .filter(performer => performer.growth > 0)
+      .slice(0, 3) // Keep consistent with previous limit
+    : []
 
   // Generate recent activity from available dates
   const recentActivity = availableDates.slice(0, 3).map(date => {

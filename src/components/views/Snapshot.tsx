@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Card from '../layout/Card'
 import { ChevronLeft, ChevronRight, Lightbulb, Edit3, Check, X, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppProvider'
-import { formatCurrency, formatPercentage, calculateInsight } from '../../utils/calculations'
+import { formatCurrency, formatPercentage, calculateInsight, calculateActualReturn } from '../../utils/calculations'
 import { format } from 'date-fns'
 import { InvestmentEntry } from '../../types'
 import { useToast } from '../../hooks/useToast'
@@ -32,12 +32,13 @@ export default function Snapshot() {
   const previousDate = currentIndex < availableDates.length - 1 ? availableDates[currentIndex + 1] : null
   const nextDate = currentIndex > 0 ? availableDates[currentIndex - 1] : null
 
-  // Calculate changes from previous month
+  // Calculate changes and actual returns from previous month
   const previousSnapshot = previousDate ? snapshots.find(s => s.date === previousDate) : null
   const entriesWithChanges = snapshot?.entries.map(entry => {
     const previousEntry = previousSnapshot?.entries.find(e => e.investment === entry.investment)
     const change = previousEntry ? entry.amount - previousEntry.amount : 0
-    return { ...entry, change }
+    const actualReturn = calculateActualReturn(entry.amount, previousEntry?.amount)
+    return { ...entry, change, actualReturn }
   }) || []
 
   const startEdit = (entry: InvestmentEntry) => {
@@ -190,7 +191,7 @@ export default function Snapshot() {
                     </td>
                     
                     {/* Rate Column */}
-                    <td className="py-3 text-right text-text-secondary hidden sm:table-cell">
+                    <td className="py-3 text-right hidden sm:table-cell">
                       {isEditing ? (
                         <input
                           type="number"
@@ -200,7 +201,19 @@ export default function Snapshot() {
                           placeholder="Rate"
                         />
                       ) : (
-                        formatPercentage(entry.rate, 1).replace('+', '')
+                        <div className="space-y-1">
+                          <div className={`text-sm font-medium ${
+                            entry.actualReturn !== null ?
+                              entry.actualReturn > 0 ? 'text-accent' :
+                              entry.actualReturn < 0 ? 'text-danger' : 'text-text-secondary'
+                            : 'text-text-muted'
+                          }`}>
+                            {entry.actualReturn !== null ? formatPercentage(entry.actualReturn, 1) : '—'}
+                          </div>
+                          <div className="text-xs text-text-muted">
+                            Expected: {formatPercentage(entry.rate, 1).replace('+', '')}
+                          </div>
+                        </div>
                       )}
                     </td>
                     
@@ -280,7 +293,7 @@ export default function Snapshot() {
             <span className="text-sm">
               {insight.topPerformer.growth > 0 && (
                 <span>
-                  {insight.topPerformer.name} showing strong {formatPercentage(insight.topPerformer.growth)} growth
+                  {insight.topPerformer.name} delivered {formatPercentage(insight.topPerformer.growth)} actual return
                 </span>
               )}
               {insight.topPerformer.growth > 0 && insight.underperformer.growth < 0 && (
@@ -288,7 +301,7 @@ export default function Snapshot() {
               )}
               {insight.underperformer.growth < 0 && (
                 <span>
-                  {insight.underperformer.name} down {formatPercentage(Math.abs(insight.underperformer.growth))}
+                  {insight.underperformer.name} declined {formatPercentage(Math.abs(insight.underperformer.growth))}
                 </span>
               )}
             </span>
