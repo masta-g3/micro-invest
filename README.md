@@ -9,22 +9,27 @@ A sleek, modern investment portfolio tracker built with React and TypeScript. Tr
 - **Monthly Performance** - Track growth and changes month-over-month
 - **Top Performers** - Identify your best-performing investments
 - **Portfolio Allocation** - Understand your investment distribution
+- **Empty State Handling** - Quick-start options for new users
 
 ### 📈 Time Series Analysis
 - **Interactive Charts** - Visualize returns, portfolio value, and allocation
 - **Cumulative vs Period Views** - See long-term trends or month-to-month changes
 - **Asset Filtering** - Focus on specific investments
 - **Multiple Chart Types** - Line charts for trends, bar charts for periods
+- **Smart Y-Axis Scaling** - Human-friendly tick marks and symmetric domains
+- **Enhanced Grid System** - Dynamic gridlines based on data range
 
 ### 📸 Portfolio Snapshots
 - **Monthly Snapshots** - Detailed view of your portfolio at any point in time
 - **Inline Editing** - Update investment values and rates directly
-- **Performance Comparison** - See changes from previous month
+- **Performance Comparison** - See changes from previous month with color-coded indicators
 - **Date Navigation** - Easily browse through your investment history
+- **Period Change Display** - View absolute and percentage changes at a glance
 
 ### ➕ Data Management
 - **CSV Import** - Load your investment data from CSV files
 - **Manual Entry** - Add new investment snapshots through the UI
+- **Prefill from Previous** - Quick entry based on latest snapshot
 - **Data Validation** - Automatic validation and error handling
 - **Persistent Storage** - Your data is saved locally in your browser
 
@@ -141,8 +146,8 @@ Use the top navigation bar or keyboard shortcuts:
 ### 6. Adding New Data
 - Select a date for your new snapshot
 - Add investment entries with amounts and growth rates
-- Use the "Prefill from Previous" button for quick entry
-- Save to update your portfolio
+- Use the "Prefill from Previous" button to auto-populate from your latest snapshot
+- Adjust values as needed and save to update your portfolio
 
 ## 📊 Key Metrics
 
@@ -165,9 +170,10 @@ The app calculates several important financial metrics:
 
 ### Performance Optimization
 - **Precise Calculations**: Uses decimal.js for financial accuracy
-- **Efficient Rendering**: Optimized React components
+- **Efficient Rendering**: Optimized React components with memoization
 - **Responsive Design**: Works on desktop and mobile
 - **Fast Load Times**: Optimized with Vite bundler
+- **Smart Chart Rendering**: Efficient Y-axis tick computation and domain handling
 
 ## 🛠️ Troubleshooting
 

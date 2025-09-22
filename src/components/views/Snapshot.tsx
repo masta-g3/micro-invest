@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import Card from '../layout/Card'
 import { ChevronLeft, ChevronRight, Lightbulb, Edit3, Check, X, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppProvider'
-import { formatCurrency, formatPercentage, calculateInsight, calculateActualReturn, annualizedToMonthly } from '../../utils/calculations'
+import { formatCurrency, formatPercentage, calculateInsight, calculateActualReturn, annualizedToMonthly, calculateGrowthFromPrevious, formatGrowth } from '../../utils/calculations'
 import { format } from 'date-fns'
 import { InvestmentEntry } from '../../types'
 import { useToast } from '../../hooks/useToast'
@@ -50,6 +50,10 @@ export default function Snapshot() {
     const actualReturn = calculateActualReturn(entry.amount, previousEntry?.amount)
     return { ...entry, change, actualReturn }
   }) || []
+
+  // Total period change for summary (absolute and percentage)
+  const periodChangeAbs = previousSnapshot ? snapshot.netWorth - previousSnapshot.netWorth : 0
+  const periodChangePct = previousSnapshot ? calculateGrowthFromPrevious(snapshot, previousSnapshot) : 0
 
   const startEdit = (entry: InvestmentEntry) => {
     setEditingEntry(entry)
@@ -294,9 +298,24 @@ export default function Snapshot() {
           <span className="text-text-secondary">
             Total Assets: {formatCurrency(snapshot.totalValue)}
           </span>
-          <span className="text-text-primary font-semibold">
-            Net Worth: {formatCurrency(snapshot.netWorth)}
-          </span>
+          <div className="text-right">
+            <div className="text-text-primary font-semibold">
+              Net Worth: {formatCurrency(snapshot.netWorth)}
+            </div>
+            <div
+              className={`text-sm font-medium ${
+                periodChangeAbs > 0
+                  ? 'text-accent'
+                  : periodChangeAbs < 0
+                  ? 'text-danger'
+                  : 'text-text-secondary'
+              }`}
+            >
+              {periodChangeAbs !== 0
+                ? `${formatGrowth(periodChangeAbs)} (${formatPercentage(periodChangePct, 1)})`
+                : '—'}
+            </div>
+          </div>
         </div>
       </Card>
 

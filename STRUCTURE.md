@@ -180,10 +180,10 @@ interface ChartSettings {
 ## 🧩 Component Architecture
 
 ### View Components (`src/components/views/`)
-- **Overview.tsx**: Dashboard with key metrics
-- **Snapshot.tsx**: Detailed portfolio view with editing
-- **TimeSeries.tsx**: Interactive charts and analysis
-- **AddEntry.tsx**: Data entry form
+- **Overview.tsx**: Dashboard with key metrics and empty state handling
+- **Snapshot.tsx**: Detailed portfolio view with inline editing and period change display
+- **TimeSeries.tsx**: Advanced interactive charts with computed Y-axis ticks and improved rendering
+- **AddEntry.tsx**: Data entry form with prefill functionality
 
 ### Layout Components (`src/components/layout/`)
 - **Container.tsx**: Page wrapper with responsive design
@@ -191,8 +191,11 @@ interface ChartSettings {
 - **Card.tsx**: Reusable card component
 
 ### Utility Components (`src/components/ui/`)
+- **Button.tsx**: Reusable button component with variants
 - **DataControls.tsx**: Export/import dropdown with toast notifications
 - **ImportDialog.tsx**: Modal dialog for CSV file import with validation
+- **Modal.tsx**: Base modal component for dialogs
+- **ToastContainer.tsx**: Toast notification container
 - **ViewToggle.tsx**: Toggle switch for chart options
 
 ### Custom Hooks (`src/hooks/`)
@@ -210,16 +213,24 @@ calculateCompoundGrowth(principal, rate, periods)
 calculateAssetPerformance(entries, assetName)
 calculatePortfolioMetrics(snapshots)
 calculateSnapshot(entries, date)
+calculateGrowthFromPrevious(current, previous)
+calculateActualReturn(entry, previousEntry)
 
 // Formatting
 formatCurrency(amount, compact?)
 formatPercentage(percentage, decimals?)
 formatGrowth(growth)
+formatChartValue(value, dataType, viewType, displayMode)
 
 // Analysis
 calculateRiskLevel(volatility)
 getDiversificationScore(allocation)
 calculateAllocation(snapshot)
+calculateInsight(currentSnapshot, previousSnapshot)
+
+// Rate conversions
+annualizedToMonthly(annualizedRate)
+monthlyToAnnualized(monthlyRate)
 ```
 
 ### Precision Handling
@@ -246,6 +257,12 @@ export const transformSnapshots = (
   dataType: 'returns' | 'portfolio' | 'allocation',
   viewType: 'cumulative' | 'period'
 ): ChartDataPoint[]
+
+// Advanced chart features:
+- computeNiceTicks(): Human-friendly Y-axis tick generation
+- Symmetric domain handling for period returns
+- Improved zero-line calculation and positioning
+- Dynamic gridline rendering based on data range
 ```
 
 ### Color Management
@@ -615,7 +632,19 @@ export default defineConfig({
 4. Update STRUCTURE.md if adding new patterns
 5. Submit PR with clear description
 
-## 🔄 Migration Notes
+## 🔄 Recent Improvements
+
+### Chart System Enhancements ✅
+- **Y-Axis Rendering**: Improved with `computeNiceTicks()` for human-friendly values
+- **Zero Line Calculation**: Enhanced accuracy for period returns
+- **Domain Handling**: Symmetric domains for better visual balance
+- **Grid Lines**: Dynamic rendering based on data range
+
+### UI/UX Improvements ✅
+- **Snapshot View**: Added period change display with color coding
+- **Overview View**: Enhanced empty state with import dialog
+- **AddEntry Form**: Prefill functionality from latest snapshot
+- **Legend Controls**: Conditional rendering based on chart mode
 
 ### From Zustand to Context API ✅
 - **Completed**: Full state management migration

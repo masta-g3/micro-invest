@@ -11,37 +11,6 @@ import {
 } from '../../utils/chartData'
 import { getAssetColorMap } from '../../utils/colors'
 
-interface YAxisLabelsProps {
-  values: number[]
-  formatValue: (value: number) => string
-  chartHeight: number
-  minVal: number
-  maxVal: number
-}
-
-const YAxisLabels = ({ values, formatValue, chartHeight, minVal, maxVal }: YAxisLabelsProps) => {
-  const range = maxVal - minVal
-
-  return (
-    <div className="absolute left-0 top-0 h-full flex flex-col text-xs text-text-muted" style={{ height: chartHeight }}>
-      {values.map((value, index) => {
-        const position = range > 0 ? (maxVal - value) / range : 0.5
-        const pixelPosition = position * chartHeight
-
-        return (
-          <span
-            key={index}
-            className="absolute -translate-y-1/2"
-            style={{ top: `${pixelPosition}px` }}
-          >
-            {formatValue(value)}
-          </span>
-        )
-      })}
-    </div>
-  )
-}
-
 export default function TimeSeries() {
   const { data, updateUI, snapshots } = useAppData()
   const { mainView, performanceView, ownershipView, showByAsset, displayMode, visibleAssets } = data.ui.chartSettings
@@ -115,6 +84,45 @@ export default function TimeSeries() {
     setVisibleAssets(inverted)
   }
 
+  // Generate human-friendly tick marks for Y axes
+  const computeNiceTicks = (min: number, max: number, maxTicks: number = 5): number[] => {
+    if (!isFinite(min) || !isFinite(max)) return [0]
+    if (min === max) {
+      const step = Math.abs(min) || 1
+      min -= step
+      max += step
+    }
+    const niceNumber = (range: number, round: boolean): number => {
+      const exponent = Math.floor(Math.log10(range))
+      const fraction = range / Math.pow(10, exponent)
+      let niceFraction: number
+      if (round) {
+        if (fraction < 1.5) niceFraction = 1
+        else if (fraction < 3) niceFraction = 2
+        else if (fraction < 7) niceFraction = 5
+        else niceFraction = 10
+      } else {
+        if (fraction <= 1) niceFraction = 1
+        else if (fraction <= 2) niceFraction = 2
+        else if (fraction <= 5) niceFraction = 5
+        else niceFraction = 10
+      }
+      return niceFraction * Math.pow(10, exponent)
+    }
+    const rawRange = max - min
+    const range = rawRange === 0 ? 1 : rawRange
+    const step = niceNumber(range / Math.max(2, maxTicks - 1), true)
+    const tickMin = Math.floor(min / step) * step
+    const tickMax = Math.ceil(max / step) * step
+    const ticks: number[] = []
+    for (let v = tickMin; v <= tickMax + step * 0.5; v += step) {
+      const vv = Math.abs(v) < step * 1e-6 ? 0 : v
+      ticks.push(Number(vv.toFixed(10)))
+      if (ticks.length > 8) break
+    }
+    return ticks
+  }
+
   const isolateAsset = (asset: string) => {
     if (asset === 'Total Portfolio') return
     const isIsolated = visibleAssets.length === 1 && visibleAssets[0] === asset
@@ -127,13 +135,16 @@ export default function TimeSeries() {
     }
   }
 
-  const LegendControls = () => (
-    <div className="flex items-center gap-2 text-xs mb-2">
-      <button onClick={selectAllAssets} className="px-2 py-0.5 rounded bg-surface-hover hover:bg-surface border border-border text-text-secondary">All</button>
-      <button onClick={selectNoneAssets} className="px-2 py-0.5 rounded bg-surface-hover hover:bg-surface border border-border text-text-secondary">None</button>
-      <button onClick={invertAssets} className="px-2 py-0.5 rounded bg-surface-hover hover:bg-surface border border-border text-text-secondary">Invert</button>
-    </div>
-  )
+  const LegendControls = () => {
+    if (!showByAsset) return null
+    return (
+      <div className="flex items-center gap-2 text-xs mb-2">
+        <button onClick={selectAllAssets} className="px-2 py-0.5 rounded bg-surface-hover hover:bg-surface border border-border text-text-secondary">All</button>
+        <button onClick={selectNoneAssets} className="px-2 py-0.5 rounded bg-surface-hover hover:bg-surface border border-border text-text-secondary">None</button>
+        <button onClick={invertAssets} className="px-2 py-0.5 rounded bg-surface-hover hover:bg-surface border border-border text-text-secondary">Invert</button>
+      </div>
+    )
+  }
 
   // Add keyboard shortcuts for chart controls
   useEffect(() => {
@@ -293,7 +304,7 @@ export default function TimeSeries() {
 
     const allValues = cumulativeData.flatMap(d => filteredAssets.map(asset => d[asset]))
 
-    // Domain that always includes 0 for returns
+    // Domain
     let maxVal: number, minVal: number
     const includeZero = dataType !== 'allocation'
     if (dataType === 'allocation') {
@@ -302,43 +313,63 @@ export default function TimeSeries() {
     } else {
       maxVal = Math.max(...allValues, includeZero ? 0 : -Infinity)
       minVal = Math.min(...allValues, includeZero ? 0 : Infinity)
-      const padding = Math.max((maxVal - minVal) * 0.05, 1e-6)
-      maxVal += padding
-      minVal -= padding
+      // For period returns, prefer symmetric domain around 0 when values cross zero
+      if (viewType === 'period' && minVal < 0 && maxVal > 0) {
+        const maxAbs = Math.max(Math.abs(maxVal), Math.abs(minVal))
+        maxVal = maxAbs
+        minVal = -maxAbs
+      } else {
+        const padding = Math.max((maxVal - minVal) * 0.05, 1e-6)
+        maxVal += padding
+        minVal -= padding
+      }
     }
     const range = maxVal - minVal || 1
+
+    // Map values to vertical percent (0% top, 100% bottom)
+    const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+    const valueToPercent = (val: number): number => {
+      if (maxVal === minVal) return 0
+      return (1 - (val - minVal) / (maxVal - minVal)) * 100
+    }
+    const middleValue = dataType === 'allocation' ? (maxVal + minVal) / 2 : 0
 
     const chartWidth = 600 // Fixed width for calculations
     const chartHeight = 200 // Fixed height for calculations
 
     const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-      if (!containerRef.current || cumulativeData.length === 0) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const localX = Math.max(0, Math.min(chartWidth, e.clientX - rect.left))
-      const ratio = cumulativeData.length > 1 ? localX / chartWidth : 0
+      if (cumulativeData.length === 0) return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const ratio = rect.width > 0 ? Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) : 0
       const index = Math.max(0, Math.min(cumulativeData.length - 1, Math.round(ratio * (cumulativeData.length - 1))))
-      setHoverState({ index, x: localX, visible: true })
+      const xView = ratio * chartWidth
+      setHoverState({ index, x: xView, visible: true })
     }
 
     const handleMouseLeave = () => setHoverState(s => ({ ...s, visible: false }))
 
     return (
       <div className="bg-surface-hover/30 rounded-lg p-4 relative">
-        {/* Y-axis labels */}
-        <YAxisLabels
-          values={[maxVal, ...(minVal < 0 && maxVal > 0 ? [0] : []), minVal]}
-          formatValue={(value) => formatChartValue(value, dataType, viewType, displayMode)}
-          chartHeight={chartHeight}
-          minVal={minVal}
-          maxVal={maxVal}
-        />
+        {/* Y-axis ticks */}
+        {(() => {
+          const ticks = computeNiceTicks(minVal, maxVal, 5)
+          return (
+            <div className="absolute left-0 top-0 h-52 w-14 text-[10px] text-text-muted">
+              {ticks.map((t) => (
+                <span key={t} className="absolute left-0 -translate-y-1/2" style={{ top: `${clamp(valueToPercent(t), 0, 100)}%` }}>
+                  {formatChartValue(t, dataType, viewType, displayMode)}
+                </span>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* Chart area */}
-        <div className="ml-12 h-52 relative" ref={containerRef}>
+        <div className="ml-14 h-52 relative" ref={containerRef}>
           <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
-            {/* Horizontal gridlines */}
-            {[0.25, 0.5, 0.75].map((p) => (
-              <line key={p} x1="0" x2={chartWidth} y1={chartHeight * p} y2={chartHeight * p} stroke="#2f2f2f" strokeWidth="1" strokeDasharray="1,3" />
+            {/* Gridlines */}
+            {computeNiceTicks(minVal, maxVal, 5).map((t) => (
+              <line key={t} x1="0" x2={chartWidth} y1={chartHeight * (valueToPercent(t) / 100)} y2={chartHeight * (valueToPercent(t) / 100)} stroke="#2f2f2f" strokeWidth="1" strokeDasharray="1,3" />
             ))}
             {/* Zero baseline */}
             {includeZero && (
@@ -405,7 +436,7 @@ export default function TimeSeries() {
           {hoverState.visible && cumulativeData[hoverState.index] && (
             <div
               className="absolute bg-surface border border-border rounded px-2 py-1 text-xs text-text-primary pointer-events-none"
-              style={{ left: Math.min(Math.max(hoverState.x + 8, 0), chartWidth - 120), top: 8 }}
+              style={{ left: Math.min(Math.max(((hoverState.x / chartWidth) * (containerRef.current?.clientWidth || chartWidth)) + 8, 0), (containerRef.current?.clientWidth || chartWidth) - 120), top: 8 }}
             >
               <div className="font-medium mb-1 text-text-secondary">{cumulativeData[hoverState.index].date}</div>
               {(() => {
@@ -482,19 +513,34 @@ export default function TimeSeries() {
       Math.max(...filteredAssets.map(asset => d[asset]))
     ))
 
+    // Map values to vertical percent (0% top, 100% bottom)
+    const minVal = 0
+    const stackedRange = maxValue - minVal || 1
+    const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+    const valueToPercent = (val: number): number => {
+      if (stackedRange === 0) return 0
+      return (1 - (val - minVal) / stackedRange) * 100
+    }
+    // midPercent no longer used; ticks are generated via computeNiceTicks
+
     return (
       <div className="bg-surface-hover/30 rounded-lg p-4 relative">
-        {/* Y-axis labels */}
-        <YAxisLabels
-          values={[maxValue, maxValue / 2, 0]}
-          formatValue={(value) => `$${(value / 1000).toFixed(0)}k`}
-          chartHeight={200}
-          minVal={0}
-          maxVal={maxValue}
-        />
+        {/* Y-axis ticks */}
+        {(() => {
+          const ticks = computeNiceTicks(minVal, maxValue, 5)
+          return (
+            <div className="absolute left-0 top-0 h-52 w-14 text-[10px] text-text-muted">
+              {ticks.map((t) => (
+                <span key={t} className="absolute left-0 -translate-y-1/2" style={{ top: `${clamp(valueToPercent(t), 0, 100)}%` }}>
+                  {formatChartValue(t, dataType, viewType, displayMode)}
+                </span>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* Chart area */}
-        <div className="ml-12 h-52 relative">
+        <div className="ml-14 h-52 relative">
           <svg className="w-full h-full" viewBox="0 0 600 200" preserveAspectRatio="none">
             {filteredAssets.map((asset) => {
               const areaPoints = stackedData.map((d, index) => {
@@ -585,6 +631,12 @@ export default function TimeSeries() {
     } else {
       maxVal = Math.max(...allValues)
       minVal = Math.min(...allValues)
+      // Symmetric domain when crossing zero (period returns only)
+      if (viewType === 'period' && minVal < 0 && maxVal > 0) {
+        const maxAbs = Math.max(Math.abs(maxVal), Math.abs(minVal))
+        maxVal = maxAbs
+        minVal = -maxAbs
+      }
       actualRange = maxVal - minVal
     }
     
@@ -593,35 +645,51 @@ export default function TimeSeries() {
     const barGroupWidth = chartWidth / data.length
     
     // Calculate zero line position based on actual data range
-    const zeroLine = minVal < 0 ? chartHeight - ((0 - minVal) / actualRange * chartHeight) : chartHeight
+    const zeroLine = minVal < 0 ? chartHeight * (maxVal / actualRange) : chartHeight
 
     const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-      if (!containerRef.current || data.length === 0) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const localX = Math.max(0, Math.min(chartWidth, e.clientX - rect.left))
-      const idx = Math.max(0, Math.min(data.length - 1, Math.round((localX / chartWidth) * (data.length - 1))))
-      setHoverState({ x: localX, index: idx, visible: true })
+      if (data.length === 0) return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const ratio = rect.width > 0 ? Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) : 0
+      const xViewRaw = ratio * chartWidth
+      const barGroupWidth = chartWidth / data.length
+      const idx = Math.max(0, Math.min(data.length - 1, Math.round((xViewRaw - (barGroupWidth / 2)) / barGroupWidth)))
+      const xViewCenter = (idx * barGroupWidth) + (barGroupWidth / 2)
+      setHoverState({ x: xViewCenter, index: idx, visible: true })
     }
 
     const handleMouseLeave = () => setHoverState(s => ({ ...s, visible: false }))
 
+    // Map values to vertical percent (0% top, 100% bottom) for labels
+    const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+    const valueToPercent = (val: number): number => {
+      if (actualRange === 0) return 0
+      return (1 - (val - minVal) / actualRange) * 100
+    }
+    const middleValue = dataType === 'allocation' ? (maxVal + minVal) / 2 : 0
+
     return (
-      <div ref={containerRef} className="bg-surface-hover/30 rounded-lg p-4 relative">
-        {/* Y-axis labels */}
-        <YAxisLabels
-          values={[maxVal, ...(minVal < 0 && maxVal > 0 ? [0] : []), minVal]}
-          formatValue={(value) => formatChartValue(value, dataType, viewType, displayMode)}
-          chartHeight={chartHeight}
-          minVal={minVal}
-          maxVal={maxVal}
-        />
+      <div className="bg-surface-hover/30 rounded-lg p-4 relative">
+        {/* Y-axis ticks */}
+        {(() => {
+          const ticks = computeNiceTicks(minVal, maxVal, 5)
+          return (
+            <div className="absolute left-0 top-0 h-52 w-14 text-[10px] text-text-muted">
+              {ticks.map((t) => (
+                <span key={t} className="absolute left-0 -translate-y-1/2" style={{ top: `${clamp(valueToPercent(t), 0, 100)}%` }}>
+                  {formatChartValue(t, dataType, viewType, displayMode)}
+                </span>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* Chart area */}
-        <div className="ml-12 h-52 relative">
+        <div className="ml-12 h-52 relative" ref={containerRef}>
           <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
-            {/* Horizontal gridlines */}
-            {[0.25, 0.5, 0.75].map((p) => (
-              <line key={p} x1="0" x2={chartWidth} y1={chartHeight * p} y2={chartHeight * p} stroke="#2f2f2f" strokeWidth="1" strokeDasharray="1,3" />
+            {/* Gridlines */}
+            {computeNiceTicks(minVal, maxVal, 5).map((t) => (
+              <line key={t} x1="0" x2={chartWidth} y1={chartHeight * (valueToPercent(t) / 100)} y2={chartHeight * (valueToPercent(t) / 100)} stroke="#2f2f2f" strokeWidth="1" strokeDasharray="1,3" />
             ))}
             {/* Zero line */}
             <line
@@ -646,10 +714,8 @@ export default function TimeSeries() {
               if (filteredAssets.length === 1 || filteredAssets[0] === 'Total Portfolio') {
                 // Single bar for total portfolio
                 const value = filteredAssets[0] === 'Total Portfolio' ? month.total : (month.assets[filteredAssets[0]] || 0)
-                const zeroPosition = chartHeight - ((0 - minVal) / actualRange * chartHeight)
-                const valuePosition = chartHeight - ((value - minVal) / actualRange * chartHeight)
-                const barHeight = Math.abs(zeroPosition - valuePosition)
-                const barY = value >= 0 ? valuePosition : zeroPosition
+                const barHeight = Math.abs(value - (value >= 0 ? 0 : minVal)) / actualRange * chartHeight
+                const barY = value >= 0 ? zeroLine - ((value - 0) / actualRange * chartHeight) : zeroLine
 
                 return (
                   <g key={`${monthIndex}-${filteredAssets[0]}`}>
@@ -707,9 +773,8 @@ export default function TimeSeries() {
                   <g key={`${monthIndex}-stacked`}>
                     {/* Positive stack */}
                     {positiveValues.map(({ asset, value }) => {
-                      const zeroPosition = chartHeight - ((0 - minVal) / actualRange * chartHeight)
                       const segmentHeight = (value / actualRange) * chartHeight
-                      const segmentY = zeroPosition - positiveOffset - segmentHeight
+                      const segmentY = zeroLine - positiveOffset - segmentHeight
                       positiveOffset += segmentHeight
 
                       return (
@@ -753,9 +818,8 @@ export default function TimeSeries() {
                     
                     {/* Negative stack */}
                     {negativeValues.map(({ asset, value }) => {
-                      const zeroPosition = chartHeight - ((0 - minVal) / actualRange * chartHeight)
                       const segmentHeight = (Math.abs(value) / actualRange) * chartHeight
-                      const segmentY = zeroPosition + negativeOffset
+                      const segmentY = zeroLine + negativeOffset
                       negativeOffset += segmentHeight
 
                       return (
@@ -806,24 +870,40 @@ export default function TimeSeries() {
           {hoverState.visible && data[hoverState.index] && (
             <div
               className="absolute px-2 py-1 text-xs bg-surface border border-border rounded text-text-primary pointer-events-none"
-              style={{ left: Math.min(Math.max(hoverState.x + 8, 0), chartWidth - 140), top: 8 }}
+              style={{ left: Math.min(Math.max(((hoverState.x / chartWidth) * (containerRef.current?.clientWidth || chartWidth)) + 8, 0), (containerRef.current?.clientWidth || chartWidth) - 140), top: 8 }}
             >
               <div className="font-medium mb-1 text-text-secondary">{data[hoverState.index].date}</div>
               {(() => {
                 const month = data[hoverState.index]
-                const rows = (filteredAssets[0] === 'Total Portfolio' && filteredAssets.length === 1)
+                const isTotalOnly = (filteredAssets[0] === 'Total Portfolio' && filteredAssets.length === 1)
+                const rows = isTotalOnly
                   ? [{ name: 'Total Portfolio', value: month.total }]
                   : filteredAssets.map(name => ({ name, value: month.assets[name] || 0 }))
                 rows.sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
-                return rows.map(r => (
-                  <div key={r.name} className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-block w-2 h-2 rounded" style={{ backgroundColor: colors[r.name] || '#10b981' }} />
-                      <span className="text-text-secondary">{r.name}</span>
-                    </div>
-                    <span>{formatChartValue(r.value, dataType, viewType, displayMode)}</span>
-                  </div>
-                ))
+
+                const totalVisible = isTotalOnly
+                  ? rows[0].value
+                  : rows.reduce((sum, r) => sum + r.value, 0)
+
+                return (
+                  <>
+                    {!isTotalOnly && dataType === 'returns' && viewType === 'period' && (
+                      <div className="flex items-center justify-between gap-3 mb-1 pb-1 border-b border-border">
+                        <span className="text-text-secondary">Total change</span>
+                        <span className="font-medium">{formatChartValue(totalVisible, dataType, viewType, displayMode)}</span>
+                      </div>
+                    )}
+                    {rows.map(r => (
+                      <div key={r.name} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block w-2 h-2 rounded" style={{ backgroundColor: colors[r.name] || '#10b981' }} />
+                          <span className="text-text-secondary">{r.name}</span>
+                        </div>
+                        <span>{formatChartValue(r.value, dataType, viewType, displayMode)}</span>
+                      </div>
+                    ))}
+                  </>
+                )
               })()}
             </div>
           )}
@@ -1012,6 +1092,13 @@ export default function TimeSeries() {
                       className="rounded border-border text-accent focus:ring-accent"
                     />
                     <span className="text-xs text-text-secondary">Split by asset</span>
+                    {showByAsset && (
+                      <span
+                        className="text-[10px] text-text-muted"
+                        title="Debt and other negative assets are excluded from this breakdown"
+                        aria-label="Debt and other negative assets are excluded from this breakdown"
+                      >ⓘ</span>
+                    )}
                     <span className="text-xs text-text-muted">a</span>
                   </label>
                 </div>
@@ -1056,6 +1143,13 @@ export default function TimeSeries() {
                       className="rounded border-border text-accent focus:ring-accent"
                     />
                     <span className="text-xs text-text-secondary">Split by asset</span>
+                    {showByAsset && (
+                      <span
+                        className="text-[10px] text-text-muted"
+                        title="Debt and other negative assets are excluded from this breakdown"
+                        aria-label="Debt and other negative assets are excluded from this breakdown"
+                      >ⓘ</span>
+                    )}
                     <span className="text-xs text-text-muted">a</span>
                   </label>
                 </div>

@@ -24,17 +24,25 @@ export default function Overview() {
   // Clean empty state for power users
   if (!latestSnapshot) {
     return (
-      <Card className="text-center py-16">
-        <h2 className="text-xl text-text-secondary mb-4">No investment data yet</h2>
-        <div className="flex justify-center gap-4">
-          <Button onClick={() => updateUI({ viewMode: 'add' })}>
-            Add Entry
-          </Button>
-          <Button variant="secondary" onClick={() => setShowImportDialog(true)}>
-            Import CSV
-          </Button>
-        </div>
-      </Card>
+      <>
+        <Card className="text-center py-16">
+          <h2 className="text-xl text-text-secondary mb-4">No investment data yet</h2>
+          <div className="flex justify-center gap-4">
+            <Button onClick={() => updateUI({ viewMode: 'add' })}>
+              Add Entry
+            </Button>
+            <Button variant="secondary" onClick={() => setShowImportDialog(true)}>
+              Import CSV
+            </Button>
+          </div>
+        </Card>
+
+        {/* Import Dialog for empty state */}
+        <ImportDialog 
+          isOpen={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+        />
+      </>
     )
   }
 
