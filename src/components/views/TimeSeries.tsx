@@ -306,13 +306,17 @@ export default function TimeSeries() {
 
     // Domain
     let maxVal: number, minVal: number
+    let dataMin = 0
+    let dataMax = 0
     const includeZero = dataType !== 'allocation'
     if (dataType === 'allocation') {
       maxVal = 100
       minVal = 0
     } else {
-      maxVal = Math.max(...allValues, includeZero ? 0 : -Infinity)
-      minVal = Math.min(...allValues, includeZero ? 0 : Infinity)
+      dataMin = Math.min(...allValues)
+      dataMax = Math.max(...allValues)
+      maxVal = Math.max(dataMax, includeZero ? 0 : -Infinity)
+      minVal = Math.min(dataMin, includeZero ? 0 : Infinity)
       // For period returns, prefer symmetric domain around 0 when values cross zero
       if (viewType === 'period' && minVal < 0 && maxVal > 0) {
         const maxAbs = Math.max(Math.abs(maxVal), Math.abs(minVal))
@@ -320,8 +324,16 @@ export default function TimeSeries() {
         minVal = -maxAbs
       } else {
         const padding = Math.max((maxVal - minVal) * 0.05, 1e-6)
-        maxVal += padding
-        minVal -= padding
+        if (includeZero && dataMin >= 0) {
+          // All non-negative: keep zero baseline at bottom, pad only top
+          maxVal += padding
+        } else if (includeZero && dataMax <= 0) {
+          // All non-positive: keep zero baseline at top, pad only bottom
+          minVal -= padding
+        } else {
+          maxVal += padding
+          minVal -= padding
+        }
       }
     }
     const range = maxVal - minVal || 1
@@ -332,7 +344,7 @@ export default function TimeSeries() {
       if (maxVal === minVal) return 0
       return (1 - (val - minVal) / (maxVal - minVal)) * 100
     }
-    const middleValue = dataType === 'allocation' ? (maxVal + minVal) / 2 : 0
+    // middleValue not used for ticks anymore
 
     const chartWidth = 600 // Fixed width for calculations
     const chartHeight = 200 // Fixed height for calculations
@@ -353,9 +365,10 @@ export default function TimeSeries() {
         {/* Y-axis ticks */}
         {(() => {
           const ticks = computeNiceTicks(minVal, maxVal, 5)
+          const displayTicks = (includeZero && dataMin >= 0) ? ticks.filter(t => t !== 0) : ticks
           return (
             <div className="absolute left-0 top-0 h-52 w-14 text-[10px] text-text-muted">
-              {ticks.map((t) => (
+              {displayTicks.map((t) => (
                 <span key={t} className="absolute left-0 -translate-y-1/2" style={{ top: `${clamp(valueToPercent(t), 0, 100)}%` }}>
                   {formatChartValue(t, dataType, viewType, displayMode)}
                 </span>
@@ -368,9 +381,13 @@ export default function TimeSeries() {
         <div className="ml-14 h-52 relative" ref={containerRef}>
           <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
             {/* Gridlines */}
-            {computeNiceTicks(minVal, maxVal, 5).map((t) => (
-              <line key={t} x1="0" x2={chartWidth} y1={chartHeight * (valueToPercent(t) / 100)} y2={chartHeight * (valueToPercent(t) / 100)} stroke="#2f2f2f" strokeWidth="1" strokeDasharray="1,3" />
-            ))}
+            {(() => {
+              const ticks = computeNiceTicks(minVal, maxVal, 5)
+              const displayTicks = (includeZero && dataMin >= 0) ? ticks.filter(t => t !== 0) : ticks
+              return displayTicks.map((t) => (
+                <line key={t} x1="0" x2={chartWidth} y1={chartHeight * (valueToPercent(t) / 100)} y2={chartHeight * (valueToPercent(t) / 100)} stroke="#2f2f2f" strokeWidth="1" strokeDasharray="1,3" />
+              ))
+            })()}
             {/* Zero baseline */}
             {includeZero && (
               <line
@@ -666,7 +683,7 @@ export default function TimeSeries() {
       if (actualRange === 0) return 0
       return (1 - (val - minVal) / actualRange) * 100
     }
-    const middleValue = dataType === 'allocation' ? (maxVal + minVal) / 2 : 0
+    // middleValue not used for ticks anymore
 
     return (
       <div className="bg-surface-hover/30 rounded-lg p-4 relative">
